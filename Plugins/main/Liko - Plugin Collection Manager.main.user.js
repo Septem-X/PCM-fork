@@ -1023,6 +1023,9 @@
       function isPluginLocked(pluginId) {
         return lockedPlugins.has(pluginId);
       }
+      window.lockedPlugins = lockedPlugins;
+      window.saveLockedPlugins = saveLockedPlugins;
+      window.isPluginLocked = isPluginLocked;
       let accountPluginSettings = {};
       let accountSettingsLoaded = false;
       let accountSettingsLoadPromise = null;

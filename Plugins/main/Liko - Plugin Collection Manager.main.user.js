@@ -2713,7 +2713,7 @@
             setPluginRuntime(id, { reloadRequired: !plugin.enabled && loadedPlugins.has(id) });
             if (plugin.enabled && !loadedPlugins.has(id)) loadSubPlugin(plugin, "custom").catch(() => {
             });
-          } } else if (src === "fusam") {
+          } else if (src === "fusam") {
               if (plugin.enabled && isPluginLocked(id)) {
                 showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
                 return;

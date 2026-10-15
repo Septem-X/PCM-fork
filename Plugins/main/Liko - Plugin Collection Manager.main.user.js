@@ -2648,6 +2648,7 @@
           if (plugin.enabled) fusamPluginSettings[plugin.fusamId] = next;
           else delete fusamPluginSettings[plugin.fusamId];
           saveFusamPluginSettings();
+          if (plugin.enabled) { lockedPlugins.add(id); saveLockedPlugins(); }
           fusamChannel.setAttribute("data-state", next);
           fusamChannel.textContent = getFusamChannelLabel(plugin, next);
           const item = fusamChannel.closest(".bc-plugin-item");

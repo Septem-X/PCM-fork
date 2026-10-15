@@ -2637,6 +2637,10 @@
           const states = ["off", ...plugin.fusamVersions.map((v) => v.distribution)];
           const currentIndex = Math.max(0, states.indexOf(plugin.distribution || "off"));
           const next = states[(currentIndex + 1) % states.length];
+          if (plugin.enabled && next === "off" && isPluginLocked(id)) {
+            showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+            return;
+          }
           const version = plugin.fusamVersions.find((v) => v.distribution === next);
           plugin.distribution = next;
           plugin.enabled = next !== "off";

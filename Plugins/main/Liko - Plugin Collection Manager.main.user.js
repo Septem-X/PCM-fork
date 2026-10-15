@@ -2293,9 +2293,13 @@
         const availableVersions = versions.filter((v) => v?.source && ["stable", "beta", "dev"].includes(v?.distribution));
         const selected = availableVersions.find((v) => v.distribution === requestedDistribution) || (saved === true ? availableVersions[0] : null);
         const manifestType = String(addon?.type || "").toLowerCase();
+        const pluginId = `fusam:${String(addon?.id || "")}`;
+        // === ДОБАВЛЕНО: если плагин включён при загрузке — блокируем его ===
+        if (selected) { lockedPlugins.add(pluginId); saveLockedPlugins(); }
+        // =====================================================================
         return {
           ...addon,
-          id: `fusam:${String(addon?.id || "")}`,
+          id: pluginId,
           fusamId: String(addon?.id || ""),
           url: selected?.source || "",
           fusamVersions: availableVersions.map((v) => ({ distribution: v.distribution, source: v.source })),

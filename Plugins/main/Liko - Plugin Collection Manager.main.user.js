@@ -1026,10 +1026,6 @@
       window.lockedPlugins = lockedPlugins;
       window.saveLockedPlugins = saveLockedPlugins;
       window.isPluginLocked = isPluginLocked;
-      window.subPlugins = subPlugins;
-      window.fusamPlugins = fusamPlugins;
-      window.customPlugins = customPlugins;
-      window.pluginSettings = pluginSettings;
       window.accountPluginSettings = accountPluginSettings;
       let accountPluginSettings = {};
       let accountSettingsLoaded = false;

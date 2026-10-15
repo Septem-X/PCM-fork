@@ -1026,7 +1026,6 @@
       window.lockedPlugins = lockedPlugins;
       window.saveLockedPlugins = saveLockedPlugins;
       window.isPluginLocked = isPluginLocked;
-      window.accountPluginSettings = accountPluginSettings;
       let accountPluginSettings = {};
       let accountSettingsLoaded = false;
       let accountSettingsLoadPromise = null;

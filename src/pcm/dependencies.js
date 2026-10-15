@@ -1,0 +1,74 @@
+import {getRepositoryBases} from './config.js';
+import {fetchFirstText, isJavaScriptText} from './network.js';
+
+const SERVICE_LOADS_KEY = '__PCMServiceLoads__';
+
+export class DependencyLoader {
+  constructor({global = window, documentRef = document, runtime = null} = {}) {
+    this.global = global;
+    this.document = documentRef;
+    this.runtime = runtime;
+    this.loads = global[SERVICE_LOADS_KEY] ??= new Map();
+  }
+
+  ensure({name, relativePath, ready}) {
+    if (ready()) return Promise.resolve(true);
+    if (this.loads.has(name)) return this.loads.get(name);
+    const promise = this.load(relativePath)
+      .then(() => {
+        if (!ready()) throw new Error(`${name} loaded without exposing its expected API`);
+        return true;
+      })
+      .catch(error => {
+        if (this.runtime) this.runtime.log('WARN', `Dependency failed: ${name}`, {error: String(error?.message || error)});
+        else console.warn(`[PCM] Dependency failed: ${name}`, error);
+        throw error;
+      })
+      .finally(() => {
+        // Share only in-flight requests. A settled promise must not hide a
+        // service that was subsequently removed or gained new API requirements.
+        if (this.loads.get(name) === promise) this.loads.delete(name);
+      });
+    this.loads.set(name, promise);
+    return promise;
+  }
+
+  async load(relativePath) {
+    const bases = getRepositoryBases(this.global).plugins;
+    const result = await fetchFirstText(bases.map(base => base + relativePath), {cache: 'no-store'}, isJavaScriptText);
+    const script = this.document.createElement('script');
+    script.dataset.pcmDependency = relativePath;
+    script.textContent = `${result.text}\n//# sourceURL=${result.url}`;
+    this.document.head.appendChild(script);
+    return result.url;
+  }
+
+  async ensureCore() {
+    // SDK readiness is required; optional services may use built-in UI fallbacks.
+    await this.ensure({
+      name: 'bcmodsdk',
+      relativePath: 'expand/bcmodsdk.js',
+      ready: () => Boolean(this.global.bcModSdk?.registerMod),
+    });
+    await this.ensure({
+      name: 'i18n',
+      relativePath: 'expand/BC_i18n.js',
+      ready: () => {
+        const liko = this.global.Liko;
+        return typeof liko?.__Sys_i18n__?.ensure === 'function'
+          && typeof liko?.__Sys_L10N__?.localize === 'function'
+          && typeof liko?.__Sys_Flags__?.ensure === 'function'
+          && typeof liko?.__Sys_Flags__?.renderLabel === 'function';
+      },
+    }).catch(() => {});
+
+    const optional = [
+      ['toast', 'expand/BC_toast_system.user.js', () => Boolean(this.global.Liko?.__Sys_Toast__)],
+      ['color', 'expand/BC_ThemeColorCheck.js', () => Boolean(this.global.Liko?.__Sys_ColorAPI__)],
+      ['chat-buttons', 'expand/BC_ChatRoomButtons.js', () => Boolean(this.global.Liko?.__Sys_ChatRoomButtons__)],
+    ];
+    for (const [name, relativePath, ready] of optional) {
+      await this.ensure({name, relativePath, ready}).catch(() => {});
+    }
+  }
+}

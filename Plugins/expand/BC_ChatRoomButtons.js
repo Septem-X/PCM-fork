@@ -1,0 +1,608 @@
+/**
+ * BC_ChatRoomButtons.js — shared coordinator for #chat-room-buttons.
+ * Owns insertion, colour/state, collapse, scrolling, ordering and visibility.
+ */
+(function (global) {
+    global.Liko = global.Liko || {};
+    if (global.Liko.__Sys_ChatRoomButtons__) return;
+
+    const CONTAINER_ID = 'chat-room-buttons';
+    const SETTINGS_KEY = 'LikoChatRoomButtons';
+    const PANEL_ID = 'lk-crb-settings-panel';
+    const ANIM_MS = 200;
+    const DEFAULT_VISIBLE_PLUGINS = 5;
+    const HEAL_INTERVAL_MS = 500;
+    // 原生 chat-room-send 被 CRB 接管改成開設定面板後，還是有人需要「單純發送
+    // 訊息」的按鈕，所以補一顆走 CDN 的 APNG 圖示按鈕，預設隱藏，需要的人自己
+    // 從設定面板拉出來顯示即可。
+    const MSG_SEND_ICON_URL = 'https://cdn.jsdelivr.net/gh/awdrrawd/liko-Plugin-Repository@main/Images/System/CRB-Send.png';
+    const slots = {};
+    const plainIds = new Set();
+    const els = new Map();
+    const specs = new Map();
+
+    function settings() {
+        const fallback = { order: [], persistent: [], hidden: [], visibleCount: DEFAULT_VISIBLE_PLUGINS, seeded: [] };
+        if (typeof Player === 'undefined' || !Player) return fallback;
+        Player.ExtensionSettings = Player.ExtensionSettings || {};
+        const saved = Player.ExtensionSettings[SETTINGS_KEY];
+        if (!saved || typeof saved !== 'object') Player.ExtensionSettings[SETTINGS_KEY] = fallback;
+        const value = Player.ExtensionSettings[SETTINGS_KEY];
+        if (!Array.isArray(value.order)) value.order = [];
+        if (!Array.isArray(value.persistent)) value.persistent = [];
+        if (!Array.isArray(value.hidden)) value.hidden = [];
+        // 記錄「哪些按鈕 id 已經套用過一次性預設可見度」，避免每次重進聊天室
+        // 都把使用者自己調整過的顯示/隱藏狀態，又強制蓋回去。
+        if (!Array.isArray(value.seeded)) value.seeded = [];
+        value.visibleCount = Math.max(1, Math.min(10, Math.round(Number(value.visibleCount) || DEFAULT_VISIBLE_PLUGINS)));
+        return value;
+    }
+
+    /**
+     * 讓某個按鈕第一次出現時採用指定的預設可見度（例如預設隱藏），但只套用
+     * 一次：套用過後會記進 settings().seeded，之後使用者自己在設定面板調整
+     * 過，就不會被這裡覆蓋回去。
+     * @param {string} id
+     * @param {boolean} hiddenByDefault
+     */
+    function seedDefaultVisibility(id, hiddenByDefault) {
+        if (typeof Player === 'undefined' || !Player) return;
+        const value = settings();
+        if (value.seeded.includes(id)) return;
+        value.seeded.push(id);
+        if (hiddenByDefault && !value.hidden.includes(id)) value.hidden.push(id);
+        saveSettings();
+    }
+
+    function saveSettings() {
+        if (typeof Player === 'undefined' || !Player) return;
+        try {
+            if (typeof ServerPlayerExtensionSettingsSync === 'function') ServerPlayerExtensionSettingsSync(SETTINGS_KEY);
+        } catch (error) { console.warn('[CRB] Failed to sync settings:', error); }
+    }
+
+    function buttonKey(el) {
+        if (!el) return '';
+        if (el.dataset.lkCrbId || el.id || el.dataset.lkCrbNativeKey) return el.dataset.lkCrbId || el.id || el.dataset.lkCrbNativeKey;
+        const hint = el.getAttribute('aria-label') || el.title || Array.from(el.classList).join('-') || el.tagName.toLowerCase();
+        el.dataset.lkCrbNativeKey = 'native-' + String(hint).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '');
+        return el.dataset.lkCrbNativeKey;
+    }
+
+    function collapseExpanded() {
+        const button = document.getElementById('chat-room-buttons-collapse');
+        return !button || button.getAttribute('aria-expanded') === 'true';
+    }
+
+    const visibilityState = new WeakMap();
+    const visibilityTimers = new WeakMap();
+    let lastExpandedState;
+    let collapsedLayoutRects = new Map();
+
+    function setHiddenAnimated(el, shouldHide) {
+        const previous = visibilityState.get(el);
+        visibilityState.set(el, shouldHide);
+        if (previous === undefined) { el.hidden = shouldHide; return; }
+        if (previous === shouldHide) {
+            // The game's native collapse handler may overwrite `hidden` after our
+            // aria-expanded observer runs. Heal that external change even when
+            // our own visibility state did not change.
+            if (!el.classList.contains('lk-crb-animating') && el.hidden !== shouldHide) el.hidden = shouldHide;
+            return;
+        }
+        const oldTimer = visibilityTimers.get(el);
+        if (oldTimer) clearTimeout(oldTimer);
+        el.hidden = false;
+        el.classList.add('lk-crb-animating');
+        if (shouldHide) {
+            requestAnimationFrame(() => el.classList.add('lk-crb-collapsed'));
+            const timer = setTimeout(() => {
+                if (visibilityState.get(el)) el.hidden = true;
+                el.classList.remove('lk-crb-animating', 'lk-crb-collapsed');
+                visibilityTimers.delete(el);
+            }, ANIM_MS + 30);
+            visibilityTimers.set(el, timer);
+        } else {
+            el.classList.add('lk-crb-collapsed');
+            void el.offsetWidth;
+            requestAnimationFrame(() => el.classList.remove('lk-crb-collapsed'));
+            const timer = setTimeout(() => {
+                el.classList.remove('lk-crb-animating');
+                visibilityTimers.delete(el);
+            }, ANIM_MS + 30);
+            visibilityTimers.set(el, timer);
+        }
+    }
+
+    function applyVisibility(el) {
+        if (!el || el.id === 'chat-room-send' || el.id === 'chat-room-buttons-collapse') return;
+        const key = buttonKey(el);
+        const spec = key && specs.get(key);
+        const userHidden = key && settings().hidden.includes(key);
+        const persistent = key && settings().persistent.includes(key);
+        const collapseHidden = (!spec || spec.collapse !== false) && !persistent && !collapseExpanded();
+        setHiddenAnimated(el, !!(userHidden || collapseHidden));
+    }
+
+    function orderedKeys(container) {
+        const buttons = Array.from(container.children).filter(el => el instanceof HTMLElement && el.id !== 'chat-room-send' && el.id !== 'chat-room-buttons-collapse');
+        const preferred = settings().order.filter(key => buttons.some(el => buttonKey(el) === key));
+        const missing = buttons
+            .filter(el => !preferred.includes(buttonKey(el)))
+            .sort((a, b) => (slots[buttonKey(a)] || 0) - (slots[buttonKey(b)] || 0))
+            .map(buttonKey);
+        return preferred.concat(missing);
+    }
+
+    function visibleRects(container) {
+        const rects = new Map();
+        Array.from(container.children).forEach(el => {
+            if (!(el instanceof HTMLElement) || el.hidden) return;
+            const rect = el.getBoundingClientRect();
+            if (rect.width && rect.height) rects.set(el, rect);
+        });
+        return rects;
+    }
+
+    function animateRetainedButtons(fromRects, toRects, collapsing) {
+        if (global.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+        fromRects.forEach((from, el) => {
+            const to = toRects.get(el);
+            if (!to || typeof el.animate !== 'function') return;
+            const dx = to.left - from.left;
+            const dy = to.top - from.top;
+            if (!dx && !dy) return;
+            const frames = collapsing
+                ? [{ transform: 'translate(0,0)' }, { transform: `translate(${dx}px,${dy}px)` }]
+                : [{ transform: `translate(${-dx}px,${-dy}px)` }, { transform: 'translate(0,0)' }];
+            const animation = el.animate(frames, {
+                duration: ANIM_MS + 30,
+                easing: 'cubic-bezier(.2,.8,.2,1)',
+                fill: collapsing ? 'forwards' : 'none',
+            });
+            if (collapsing) setTimeout(() => animation.cancel(), ANIM_MS + 30);
+        });
+    }
+
+    function applyLayout() {
+        const container = document.getElementById(CONTAINER_ID);
+        if (!container) return;
+        const expanded = collapseExpanded();
+        const stateChanged = lastExpandedState !== undefined && lastExpandedState !== expanded;
+        const beforeRects = stateChanged ? visibleRects(container) : null;
+        lastExpandedState = expanded;
+        container.dir = 'ltr';
+        const totalVisible = settings().visibleCount + 1;
+        const gapCount = Math.max(0, totalVisible - 1);
+        container.style.setProperty('--lk-crb-max-width', `calc(var(--button-size) * ${totalVisible} + min(.4vh,.2vw) * ${gapCount})`);
+        const keys = orderedKeys(container);
+        const hasPersistentButton = keys.some(key => settings().persistent.includes(key));
+        Array.from(container.children).forEach(el => {
+            const key = buttonKey(el);
+            if (el.id === 'chat-room-send') {
+                el.style.order = '-10000';
+                setHiddenAnimated(el, !collapseExpanded() && hasPersistentButton);
+            }
+            else if (el.id === 'chat-room-buttons-collapse') el.style.order = '10000';
+            else if (key) el.style.order = String(keys.indexOf(key));
+            applyVisibility(el);
+        });
+        if (!stateChanged) {
+            if (!expanded && !container.querySelector('.lk-crb-animating')) collapsedLayoutRects = visibleRects(container);
+            return;
+        }
+        if (expanded) {
+            animateRetainedButtons(collapsedLayoutRects.size ? collapsedLayoutRects : beforeRects, visibleRects(container), false);
+            return;
+        }
+
+        // Measure the final collapsed layout without waiting for the outgoing
+        // buttons' fade animation, then immediately restore them so they can
+        // finish animating while the retained buttons slide into position.
+        const temporarilyHidden = [];
+        Array.from(container.children).forEach(el => {
+            if (!(el instanceof HTMLElement) || el.hidden || !visibilityState.get(el)) return;
+            temporarilyHidden.push(el); el.hidden = true;
+        });
+        const collapsedRects = visibleRects(container);
+        temporarilyHidden.forEach(el => { el.hidden = false; });
+        collapsedLayoutRects = collapsedRects;
+        animateRetainedButtons(beforeRects, collapsedRects, true);
+    }
+
+    function register(id, order, el) {
+        slots[id] = Number(order) || 0;
+        if (el) {
+            els.set(id, el);
+            el.dataset.lkCrbId = id;
+            el.classList.toggle('lk-crb-plain', plainIds.has(id));
+        }
+        applyLayout();
+        return slots[id];
+    }
+
+    function get(id) { return slots[id]; }
+    function reapply(id, el) { if (id in slots) register(id, slots[id], el); }
+    function setPlain(id, on = true) {
+        if (on) plainIds.add(id); else plainIds.delete(id);
+        els.get(id)?.classList.toggle('lk-crb-plain', on);
+    }
+
+    function appendRasterIcon(button, icon) {
+        const animated = icon.animated === true || icon.animated === 'auto' && /\.(apng|gif|webp)(?:[?#]|$)/i.test(icon.src);
+        if (!animated) {
+            const image = document.createElement('img');
+            image.src = icon.src; image.alt = icon.alt || ''; image.className = 'lk-crb-icon-layer ' + (icon.className || '');
+            button.appendChild(image); return;
+        }
+        const motionAllowed = !global.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        const image = document.createElement('img');
+        image.alt = icon.alt || ''; image.className = 'lk-crb-icon-layer lk-crb-animated ' + (icon.className || '');
+        if (icon.crossOrigin !== false) image.crossOrigin = icon.crossOrigin || 'anonymous';
+        let poster;
+        if (icon.poster) {
+            poster = document.createElement('img'); poster.src = icon.poster; poster.alt = ''; poster.dataset.lkCrbPoster = '1';
+        } else {
+            poster = document.createElement('canvas'); poster.width = 96; poster.height = 96; poster.dataset.lkCrbPoster = '1';
+        }
+        poster.className = 'lk-crb-icon-layer lk-crb-poster';
+        const snapshot = () => {
+            if (!(poster instanceof HTMLCanvasElement)) return true;
+            try { const context = poster.getContext('2d'); context.clearRect(0, 0, 96, 96); context.drawImage(image, 0, 0, 96, 96); return true; } catch (_error) { return false; }
+        };
+        let playing = false;
+        const stop = () => {
+            playing = false;
+            if (!snapshot()) { image.classList.remove('lk-crb-icon-hidden'); poster.classList.add('lk-crb-icon-hidden'); return; }
+            image.classList.add('lk-crb-icon-hidden'); poster.classList.remove('lk-crb-icon-hidden');
+            image.removeAttribute('src');
+        };
+        const play = () => {
+            if (!motionAllowed) return;
+            playing = true; image.classList.remove('lk-crb-icon-hidden'); poster.classList.add('lk-crb-icon-hidden');
+            if (!image.getAttribute('src')) image.src = icon.src;
+        };
+        image.addEventListener('load', () => { if (!playing) stop(); });
+        button.addEventListener('pointerenter', play);
+        button.addEventListener('pointerleave', stop);
+        image.classList.add('lk-crb-icon-hidden');
+        button.append(poster, image);
+        image.src = icon.src;
+    }
+
+    function createManagedButton(spec) {
+        const button = document.createElement('button');
+        button.id = spec.buttonId || ('lk-crb-' + spec.id);
+        button.type = 'button';
+        button.className = 'blank-button button HideOnPopup chat-room-button';
+        button.setAttribute('role', 'menuitem');
+        let icon = typeof spec.icon === 'function' ? spec.icon(button) : spec.icon;
+        if (icon instanceof Node) button.appendChild(icon);
+        else if (icon && typeof icon === 'object' && icon.src) appendRasterIcon(button, icon);
+        else if (typeof icon === 'string') button.innerHTML = icon;
+        if (typeof spec.onClick === 'function') button.addEventListener('click', event => {
+            event.preventDefault(); event.stopPropagation(); spec.onClick(event, button);
+        });
+        return button;
+    }
+
+    function applyState(id, patch) {
+        const spec = specs.get(id);
+        if (!spec) return;
+        spec.state = Object.assign({}, spec.state || {}, patch || {});
+        const el = els.get(id);
+        if (!el) return;
+        const active = !!spec.state.active;
+        const activeSpec = spec.active || {};
+        const border = spec.state.border || (active && activeSpec.border) || spec.border;
+        el.classList.toggle('lk-crb-active', active);
+        el.classList.toggle('lk-crb-borderless', border === 'none');
+        let tooltip = spec.state.tooltip || (active && activeSpec.tooltip) || spec.tooltip || id;
+        if (typeof tooltip === 'function') tooltip = tooltip(active, el);
+        el.setAttribute('aria-label', String(tooltip));
+        el.dataset.lkCrbTooltip = String(tooltip);
+        const values = {
+            '--lk-crb-current-bg': spec.state.background || (active && activeSpec.background) || spec.background,
+            '--lk-crb-current-border': border,
+            '--lk-crb-current-color': spec.state.color || (active && activeSpec.color) || spec.color,
+            '--lk-crb-current-shadow': spec.state.boxShadow || (active && activeSpec.boxShadow),
+        };
+        Object.entries(values).forEach(([name, value]) => value ? el.style.setProperty(name, value) : el.style.removeProperty(name));
+    }
+
+    function ensureButton(id) {
+        const spec = specs.get(id);
+        const container = document.getElementById(CONTAINER_ID);
+        if (!spec || !container) return;
+        let el = els.get(id);
+        if (!el || !el.isConnected || el.parentElement !== container) {
+            if (el?.isConnected) el.remove();
+            el = spec.createButton ? spec.createButton() : createManagedButton(spec);
+            if (!el) return;
+            if (!el.id) el.id = 'lk-crb-' + id;
+            container.appendChild(el);
+        }
+        el.classList.add('lk-crb-managed');
+        if (!spec.tooltip && el.title) spec.tooltip = el.title;
+        el.removeAttribute('title');
+        if (spec.className) el.classList.add(...String(spec.className).split(/\s+/).filter(Boolean));
+        if (spec.plain) plainIds.add(id);
+        register(id, spec.order, el);
+        applyState(id, spec.state || {});
+    }
+
+    function add(input) {
+        if (!input || typeof input !== 'object' || !input.id || (!input.icon && typeof input.createButton !== 'function')) throw new TypeError('CRB.add requires { id, order, icon|createButton }');
+        const spec = Object.assign({ order: 0, tooltip: input.id, collapse: true, plain: false, state: {} }, input);
+        if (input.icon && input.plain === undefined) spec.plain = true;
+        specs.set(spec.id, spec);
+        ensureButton(spec.id);
+        return spec.id;
+    }
+
+    function remove(id) {
+        specs.delete(id);
+        els.get(id)?.remove();
+        els.delete(id); delete slots[id]; plainIds.delete(id);
+        applyLayout();
+    }
+
+    function injectStyle() {
+        if (document.getElementById('lk-crb-layout-style')) return;
+        const style = document.createElement('style');
+        style.id = 'lk-crb-layout-style';
+        style.textContent = `
+#${CONTAINER_ID}{grid-template-columns:unset!important;grid-template-rows:min-content!important;grid-auto-flow:column!important;grid-auto-columns:min-content!important;max-width:var(--lk-crb-max-width,calc(var(--button-size) * 6 + min(.4vh,.2vw) * 5))!important;overflow-x:auto!important;overflow-y:visible!important;scrollbar-width:none!important;overscroll-behavior-x:contain!important}
+#${CONTAINER_ID}::-webkit-scrollbar{display:none!important}
+#${CONTAINER_ID}.lk-crb-dragging{cursor:grabbing!important}
+#${CONTAINER_ID}>button:not(#chat-room-send){cursor:grab}
+#${CONTAINER_ID}>.lk-crb-plain::before{background:none!important}
+#${CONTAINER_ID}>.lk-crb-managed{position:relative!important;overflow:hidden!important;border-radius:12px!important;background:var(--lk-crb-current-bg)!important;color:var(--lk-crb-current-color)!important;border:var(--lk-crb-current-border)!important;box-shadow:var(--lk-crb-current-shadow)!important}
+#${CONTAINER_ID}>.lk-crb-managed.lk-crb-borderless{border:none!important;outline:none!important}
+#${CONTAINER_ID}>.lk-crb-managed>svg{position:absolute!important;z-index:2!important;inset:19%!important;width:62%!important;height:62%!important;display:block!important;pointer-events:none!important}
+#${CONTAINER_ID}>.lk-crb-managed>.lk-crb-icon-layer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;object-fit:contain!important;pointer-events:none!important} #${CONTAINER_ID}>.lk-crb-managed>.lk-crb-icon-hidden{display:none!important}
+#${CONTAINER_ID}>.lk-crb-animating[hidden]{display:flex!important}
+#${CONTAINER_ID}>.lk-crb-animating{transition:opacity ${ANIM_MS}ms ease,transform ${ANIM_MS}ms ease;opacity:1;transform:translateX(0);pointer-events:auto}
+#${CONTAINER_ID}>.lk-crb-animating.lk-crb-collapsed{opacity:0!important;transform:translateX(18px)!important;pointer-events:none}
+.lk-crb-tooltip{position:fixed;z-index:2147483646;padding:6px 9px;border:1px solid #ffffff2e;border-radius:7px;background:#121419f7;color:#f2f3f5;font:600 12px/1.35 sans-serif;pointer-events:none}
+#${PANEL_ID}-backdrop{position:fixed;inset:0;z-index:2147483646;background:rgba(3,4,7,.72);backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px;box-sizing:border-box;user-select:none;-webkit-user-select:none}
+#${PANEL_ID}{--crb-neon:#49d9ff;--crb-violet:#9d68ff;position:relative;width:min(450px,100%);max-height:min(590px,calc(100vh - 40px));overflow:auto;box-sizing:border-box;padding:0;border:1px solid #49d9ff70;border-radius:16px;background:linear-gradient(145deg,#182033fa,#090d18fc);color:#f4f7ff;color-scheme:dark;font:14px/1.4 system-ui,sans-serif;box-shadow:0 28px 90px #000e,0 0 28px #49d9ff20,0 0 0 1px #9d68ff22 inset}
+#${PANEL_ID}::before{content:"";position:absolute;z-index:3;left:18px;right:18px;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--crb-neon),var(--crb-violet),transparent);box-shadow:0 0 12px var(--crb-neon);pointer-events:none}
+#${PANEL_ID} .lk-crb-head,#${PANEL_ID} .lk-crb-actions{display:flex;align-items:center;gap:10px}
+#${PANEL_ID} .lk-crb-head{position:sticky;top:0;z-index:2;padding:18px 20px;background:linear-gradient(90deg,#19243aed,#111627ed);border-bottom:1px solid #49d9ff2c} #${PANEL_ID} .lk-crb-head b{flex:1;font-size:18px;letter-spacing:.5px;text-shadow:0 0 12px #49d9ff45}
+#${PANEL_ID} .lk-crb-body{padding:14px 18px 18px} #${PANEL_ID} .lk-crb-count{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:16px}
+#${PANEL_ID} .lk-crb-zone-label{margin:10px 2px 6px;color:#aeb7cc;font-size:14px;font-weight:700} #${PANEL_ID} .lk-crb-zone{min-height:72px;box-sizing:border-box;display:flex;align-content:flex-start;flex-wrap:wrap;gap:10px;padding:8px;border:1px dashed #7683a54d;border-radius:14px;background:#06081045;transition:border-color .15s,background .15s}
+#${PANEL_ID} .lk-crb-zone.lk-crb-zone-over{border-color:var(--crb-neon);background:#49d9ff12;box-shadow:0 0 16px #49d9ff18 inset} #${PANEL_ID} .lk-crb-item{position:relative;width:54px;height:54px;display:grid;place-items:center;border:1px solid #ffffff20;border-radius:13px;background:#0b0e16;cursor:grab;overflow:hidden;transition:transform .15s,border-color .15s,opacity .15s,box-shadow .15s}
+#${PANEL_ID} .lk-crb-item:hover{transform:translateY(-2px);border-color:var(--crb-neon);box-shadow:0 0 14px #49d9ff42} #${PANEL_ID} .lk-crb-item.lk-crb-sort-drag{opacity:.35} #${PANEL_ID} .lk-crb-item>*{max-width:100%!important;max-height:100%!important;width:100%!important;height:100%!important;object-fit:contain!important;pointer-events:none!important}
+#${PANEL_ID} .lk-crb-item svg{width:62%!important;height:62%!important;display:block!important} #${PANEL_ID} .lk-crb-emoji{display:grid!important;place-items:center;font-size:28px!important;line-height:1!important}
+#${PANEL_ID} button,#${PANEL_ID} select{border:1px solid #49d9ff42;border-radius:8px;background:linear-gradient(145deg,#27344f,#171d2e);color:#fff;padding:7px 10px;cursor:pointer;user-select:none;-webkit-user-select:none} #${PANEL_ID} button:hover,#${PANEL_ID} select:hover{border-color:var(--crb-neon);box-shadow:0 0 12px #49d9ff25} #${PANEL_ID} .lk-crb-close,#${PANEL_ID} .lk-crb-reset{font-size:20px;line-height:1;padding:5px 9px}
+#${PANEL_ID} select option{background:#171d2e!important;color:#f4f7ff!important} #${PANEL_ID} select option:checked{background:#2468c9!important;color:#fff!important}
+#${PANEL_ID} .lk-crb-actions{margin-top:16px;justify-content:flex-end}
+`;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    let tooltipEl;
+    function hideTooltip() { tooltipEl?.remove(); tooltipEl = null; }
+    function showTooltip(button) {
+        const text = button?.dataset.lkCrbTooltip;
+        if (!text) return;
+        hideTooltip(); tooltipEl = document.createElement('div'); tooltipEl.className = 'lk-crb-tooltip'; tooltipEl.textContent = text; document.body.appendChild(tooltipEl);
+        const r = button.getBoundingClientRect(), t = tooltipEl.getBoundingClientRect();
+        tooltipEl.style.left = Math.max(8, Math.min(innerWidth - t.width - 8, r.left + (r.width - t.width) / 2)) + 'px';
+        tooltipEl.style.top = Math.max(8, r.top - t.height - 8) + 'px';
+    }
+
+    function copyButtonIcon(source, target) {
+        const sourceStyle = getComputedStyle(source);
+        target.style.background = sourceStyle.background;
+        target.style.backgroundColor = sourceStyle.backgroundColor;
+        target.style.color = sourceStyle.color;
+        target.style.boxShadow = sourceStyle.boxShadow;
+        const posterCanvas = source.querySelector('canvas[data-lk-crb-poster]');
+        if (posterCanvas) {
+            try { const image = new Image(); image.src = posterCanvas.toDataURL(); target.appendChild(image); return; } catch (_error) {}
+        }
+        const imageSource = source.querySelector('img[data-lk-crb-poster], img:not(.lk-crb-animated)');
+        if (imageSource) {
+            const image = imageSource.cloneNode(true);
+            image.hidden = false; image.className = ''; image.style.cssText = 'display:block!important;width:100%!important;height:100%!important;object-fit:contain!important';
+            target.appendChild(image); return;
+        }
+        const svgSource = source.querySelector('svg');
+        if (svgSource) { target.appendChild(svgSource.cloneNode(true)); return; }
+        const canvas = source.querySelector('canvas');
+        if (canvas) {
+            try { const image = new Image(); image.src = canvas.toDataURL(); target.appendChild(image); return; } catch (_error) {}
+        }
+        const text = source.textContent.trim();
+        if (text) {
+            const emoji = document.createElement('span'); emoji.className = 'lk-crb-emoji'; emoji.textContent = text;
+            target.appendChild(emoji); return;
+        }
+        const pseudo = getComputedStyle(source, '::before');
+        const preview = document.createElement('span');
+        preview.style.cssText = `display:block!important;width:100%!important;height:100%!important;background:${pseudo.background};background-color:${pseudo.backgroundColor};background-image:${pseudo.backgroundImage};background-position:${pseudo.backgroundPosition};background-size:${pseudo.backgroundSize};background-repeat:${pseudo.backgroundRepeat};mask-image:${pseudo.maskImage};mask-position:${pseudo.maskPosition};mask-size:${pseudo.maskSize};mask-repeat:${pseudo.maskRepeat};-webkit-mask-image:${pseudo.webkitMaskImage};-webkit-mask-position:${pseudo.webkitMaskPosition};-webkit-mask-size:${pseudo.webkitMaskSize};-webkit-mask-repeat:${pseudo.webkitMaskRepeat};color:${pseudo.color}`;
+        target.appendChild(preview);
+    }
+
+    function panelText() {
+        const language = typeof TranslationLanguage === 'string' ? TranslationLanguage.toUpperCase() : 'EN';
+        if (language === 'TW') return { title: '聊天室按鈕設定', close: '關閉', count: '顯示按鈕數量', persistent: '常駐功能', visible: '顯示', hidden: '隱藏', reset: '還原預設' };
+        if (language === 'CN') return { title: '聊天室按钮设置', close: '关闭', count: '显示按钮数量', persistent: '常驻功能', visible: '显示', hidden: '隐藏', reset: '恢复默认' };
+        return { title: 'Chat Button Settings', close: 'Close', count: 'Visible button count', persistent: 'Persistent features', visible: 'Visible', hidden: 'Hidden', reset: 'Reset defaults' };
+    }
+
+    function openSettingsPanel() {
+        const old = document.getElementById(PANEL_ID + '-backdrop');
+        if (old) { old.remove(); return; }
+        const container = document.getElementById(CONTAINER_ID);
+        if (!container) return;
+        const backdrop = document.createElement('div'); backdrop.id = PANEL_ID + '-backdrop';
+        const panel = document.createElement('section'); panel.id = PANEL_ID; backdrop.appendChild(panel);
+
+        const saveDisplayedOrder = keys => {
+            settings().order = keys.slice();
+            saveSettings(); applyLayout();
+        };
+        const render = () => {
+            const text = panelText();
+            const keys = orderedKeys(container);
+            const sources = new Map(Array.from(container.children).map(el => [buttonKey(el), el]));
+            const countOptions = Array.from({ length: 10 }, (_value, index) => `<option value="${index + 1}">${index + 1}</option>`).join('');
+            panel.innerHTML = `<div class="lk-crb-head"><b>${text.title}</b><button class="lk-crb-reset" data-reset aria-label="${text.reset}" title="${text.reset}">↺</button><button class="lk-crb-close" data-close aria-label="${text.close}">×</button></div><div class="lk-crb-body"><div class="lk-crb-zone-label">${text.persistent}</div><div class="lk-crb-zone" data-zone="persistent"></div><label class="lk-crb-count"><span>${text.count}</span><select data-visible-count>${countOptions}</select></label><div class="lk-crb-zone-label">${text.visible}</div><div class="lk-crb-zone" data-zone="visible"></div><div class="lk-crb-zone-label">${text.hidden}</div><div class="lk-crb-zone" data-zone="hidden"></div></div>`;
+            panel.querySelector('[data-visible-count]').value = String(settings().visibleCount);
+            panel.querySelectorAll('.lk-crb-zone').forEach(zone => { zone.dir = 'rtl'; });
+            keys.forEach(key => {
+                const source = sources.get(key);
+                const persistent = settings().persistent.includes(key);
+                const hidden = settings().hidden.includes(key);
+                const item = document.createElement('div'); item.className = 'lk-crb-item'; item.dataset.key = key; item.draggable = true;
+                item.title = source?.dataset.lkCrbTooltip || source?.getAttribute('aria-label') || source?.title || key;
+                if (source) copyButtonIcon(source, item);
+                panel.querySelector(`[data-zone="${persistent ? 'persistent' : hidden ? 'hidden' : 'visible'}"]`).appendChild(item);
+            });
+            panel.querySelector('[data-close]').onclick = () => backdrop.remove();
+            panel.querySelector('[data-visible-count]').onchange = event => {
+                settings().visibleCount = Number(event.target.value) || DEFAULT_VISIBLE_PLUGINS;
+                saveSettings(); applyLayout();
+            };
+            panel.querySelector('[data-reset]').onclick = () => {
+                // seeded 也要一併清空，不然 msg-Send 等「預設隱藏」的按鈕會因為
+                // seedDefaultVisibility() 判斷「已經套用過一次」而被跳過，
+                // 還原後反而變成顯示、不是真的回到預設狀態。
+                Object.assign(settings(), { order: [], persistent: [], hidden: [], visibleCount: DEFAULT_VISIBLE_PLUGINS, seeded: [] });
+                applyDefaultSeeds();
+                saveSettings(); applyLayout(); render();
+            };
+            let draggedKey = null;
+            const zones = Array.from(panel.querySelectorAll('.lk-crb-zone'));
+            const commitZones = () => {
+                const persistent = Array.from(panel.querySelector('[data-zone="persistent"]').children).map(el => el.dataset.key);
+                const visible = Array.from(panel.querySelector('[data-zone="visible"]').children).map(el => el.dataset.key);
+                const hidden = Array.from(panel.querySelector('[data-zone="hidden"]').children).map(el => el.dataset.key);
+                settings().persistent = persistent; settings().hidden = hidden; saveDisplayedOrder(persistent.concat(visible, hidden));
+            };
+            panel.addEventListener('click', event => {
+                const item = event.target.closest('.lk-crb-item'); if (!item) return;
+                const nextZone = { persistent: 'visible', visible: 'hidden', hidden: 'persistent' }[item.parentElement.dataset.zone];
+                const destination = panel.querySelector(`[data-zone="${nextZone}"]`);
+                destination.appendChild(item); commitZones();
+            });
+            panel.addEventListener('dragstart', event => {
+                const item = event.target.closest('.lk-crb-item'); if (!item) return;
+                draggedKey = item.dataset.key; item.classList.add('lk-crb-sort-drag');
+                event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', draggedKey);
+            });
+            zones.forEach(zone => {
+                zone.addEventListener('dragover', event => {
+                    event.preventDefault(); zone.classList.add('lk-crb-zone-over');
+                    const item = event.target.closest('.lk-crb-item');
+                    const dragged = panel.querySelector(`.lk-crb-item[data-key="${CSS.escape(draggedKey || '')}"]`);
+                    if (dragged && item && item !== dragged) zone.insertBefore(dragged, item);
+                    else if (dragged && !item) zone.appendChild(dragged);
+                });
+                zone.addEventListener('dragleave', event => { if (!zone.contains(event.relatedTarget)) zone.classList.remove('lk-crb-zone-over'); });
+                zone.addEventListener('drop', event => { event.preventDefault(); zone.classList.remove('lk-crb-zone-over'); commitZones(); });
+            });
+            panel.addEventListener('dragend', () => { if (draggedKey) commitZones(); draggedKey = null; panel.querySelectorAll('.lk-crb-sort-drag,.lk-crb-zone-over').forEach(el => el.classList.remove('lk-crb-sort-drag', 'lk-crb-zone-over')); });
+        };
+        backdrop.addEventListener('click', event => { if (event.target === backdrop) backdrop.remove(); });
+        render(); document.body.appendChild(backdrop);
+    }
+
+    let drag = null;
+    document.addEventListener('pointerdown', event => {
+        if (event.pointerType && event.pointerType !== 'mouse') return;
+        const button = event.target.closest?.(`#${CONTAINER_ID}>*`);
+        if (!button || button.id === 'chat-room-send' || button.dataset.crbNoDrag !== undefined) return;
+        const container = button.parentElement;
+        drag = { container, startX: event.clientX, startScroll: container.scrollLeft, moved: false };
+    }, true);
+    document.addEventListener('pointermove', event => {
+        if (!drag) return;
+        const dx = event.clientX - drag.startX;
+        if (!drag.moved && Math.abs(dx) > 4) { drag.moved = true; drag.container.classList.add('lk-crb-dragging'); }
+        if (drag.moved) { drag.container.scrollLeft = drag.startScroll - dx; event.preventDefault(); }
+    }, true);
+    function endDrag() {
+        if (!drag) return;
+        const { container, moved } = drag; drag = null; container.classList.remove('lk-crb-dragging');
+        if (moved) {
+            const swallow = event => { event.preventDefault(); event.stopPropagation(); };
+            document.addEventListener('click', swallow, { capture: true, once: true });
+            setTimeout(() => document.removeEventListener('click', swallow, true), 100);
+        }
+    }
+    document.addEventListener('pointerup', endDrag, true);
+    document.addEventListener('pointercancel', endDrag, true);
+
+    document.addEventListener('wheel', event => {
+        const container = event.target.closest?.('#' + CONTAINER_ID);
+        if (!container || container.scrollWidth <= container.clientWidth) return;
+        let delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+        if (!delta) return;
+        if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) delta *= 24;
+        else if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) delta *= container.clientWidth;
+        const direction = getComputedStyle(container).direction === 'rtl' ? -1 : 1;
+        container.scrollBy({ left: delta * direction, behavior: 'auto' });
+        event.preventDefault();
+    }, { capture: true, passive: false });
+
+    document.addEventListener('click', event => {
+        if (!event.target.closest?.('#chat-room-send')) return;
+        event.preventDefault(); event.stopImmediatePropagation(); openSettingsPanel();
+    }, true);
+    document.addEventListener('pointerover', event => { const b = event.target.closest?.(`#${CONTAINER_ID}>.lk-crb-managed`); if (b) showTooltip(b); }, true);
+    document.addEventListener('pointerout', event => {
+        const button = event.target.closest?.(`#${CONTAINER_ID}>.lk-crb-managed`);
+        if (button && (!event.relatedTarget || !button.contains(event.relatedTarget))) hideTooltip();
+    }, true);
+
+    const observer = new MutationObserver(() => {
+        specs.forEach((_spec, id) => ensureButton(id));
+        applyLayout();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded', 'hidden'] });
+    setInterval(() => { applyDefaultSeeds(); specs.forEach((_spec, id) => ensureButton(id)); applyLayout(); }, HEAL_INTERVAL_MS);
+    injectStyle();
+
+    /** 集中列出「第一次出現時預設隱藏」的按鈕 id，bootstrap 跟設定面板的
+     *  「還原預設」都呼叫這裡，確保兩邊行為一致。 */
+    function applyDefaultSeeds() {
+        seedDefaultVisibility('msg-Send', true);
+    }
+
+    function msgSendTooltip() {
+        const language = typeof TranslationLanguage === 'string' ? TranslationLanguage.toUpperCase() : 'EN';
+        if (language === 'TW') return '傳送訊息';
+        if (language === 'CN') return '发送消息';
+        return 'Send Message';
+    }
+
+    // 補回原本 chat-room-send 的「發送訊息」功能：CRB 把原生按鈕改成開設定
+    // 面板後，這顆是唯一還會呼叫 ChatRoomSendChat() 的按鈕。預設放進隱藏區，
+    // 使用者若還是想要一顆單純發送用的按鈕，可自行從設定面板拉到顯示區。
+    add({
+        id: 'msg-Send',
+        order: -9990,
+        collapse: true,
+        tooltip: msgSendTooltip,
+        background: '#49d9ff', // 水藍色，跟設定面板的 --crb-neon 同色系
+        icon: { src: MSG_SEND_ICON_URL, animated: true, alt: 'Send' },
+        onClick: () => {
+            try { if (typeof ChatRoomSendChat === 'function') ChatRoomSendChat(); }
+            catch (error) { console.warn('[CRB] msg-Send failed:', error); }
+        },
+    });
+    applyDefaultSeeds();
+
+    global.Liko.__Sys_ChatRoomButtons__ = {
+        Version: '1.0', slots, plainIds, register, get, reapply, setPlain, add, remove,
+        setState: applyState, setActive: (id, active) => applyState(id, { active: !!active }),
+        openSettings: openSettingsPanel, applyLayout,
+    };
+
+    const pending = global.Liko.__CRB_pending__;
+    if (Array.isArray(pending)) while (pending.length) { try { add(pending.shift()); } catch (error) { console.warn('[CRB] pending add failed:', error); } }
+})(window);

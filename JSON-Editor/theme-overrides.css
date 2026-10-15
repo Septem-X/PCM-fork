@@ -1,0 +1,153 @@
+/* Blue-violet theme and layout fixes kept separate from the compact base stylesheet. */
+:root {
+  --bg: #0d1018;
+  --panel: #151925;
+  --panel2: #1d2332;
+  --line: #30394c;
+  --text: #f4f6ff;
+  --muted: #9ca8c2;
+  --green: #8ba7ff;
+  --green2: #9b7cf7;
+  --danger: #ff7f8d;
+}
+
+body {
+  background:
+    radial-gradient(circle at 78% -8%, rgba(118, 86, 224, .22), transparent 32rem),
+    radial-gradient(circle at 15% 5%, rgba(62, 121, 224, .15), transparent 28rem),
+    var(--bg);
+}
+
+body[data-workspace="fusam"] {
+  --bg: #180e17;
+  --panel: #21141f;
+  --panel2: #2b1928;
+  --line: #503047;
+  --muted: #c2a2b6;
+  --green: #ff9fca;
+  --green2: #ee79ad;
+  background:
+    radial-gradient(circle at 78% -8%, rgba(239, 92, 164, .25), transparent 34rem),
+    radial-gradient(circle at 12% 8%, rgba(255, 143, 191, .14), transparent 28rem),
+    var(--bg);
+}
+
+body[data-workspace="fusam"] .primary,
+body[data-workspace="fusam"] #addEntry {
+  color: #2a0b1a;
+  border-color: #ff9dca;
+  background: linear-gradient(135deg, #ffafd2, #ee79ad);
+}
+
+body[data-workspace="fusam"] nav button.active {
+  color: #2a0b1a;
+  border-color: #ff9dca;
+  background: linear-gradient(135deg, #ff9fc9, #ee79ad);
+}
+
+body[data-workspace="fusam"] .entry-button.active {
+  border-color: #ff9fc9;
+  background: rgba(238, 121, 173, .14);
+}
+
+body[data-workspace="fusam"] input:focus,
+body[data-workspace="fusam"] textarea:focus,
+body[data-workspace="fusam"] select:focus {
+  border-color: #ee79ad;
+  box-shadow: 0 0 0 3px rgba(238, 121, 173, .18);
+}
+
+/* .layout has an author-level display rule, so explicitly restore hidden behavior. */
+[hidden] { display: none !important; }
+
+.primary,
+#addEntry {
+  color: #0b1020;
+  background: linear-gradient(135deg, #91b4ff, #a58aff);
+  border-color: #9ca6ff;
+}
+
+nav button.active {
+  color: #f7f8ff;
+  background: linear-gradient(135deg, #426fd4, #7959cf);
+  border-color: #9b8aef;
+}
+
+nav button[data-file="fusam.json"] {
+  color: #ff9fca;
+  border-color: #8b4569;
+  background: rgba(113, 43, 82, .18);
+}
+
+nav button[data-file="fusam.json"].active {
+  color: #2a0b1a;
+  border-color: #ff9dca;
+  background: linear-gradient(135deg, #ff9fc9, #ee79ad);
+}
+
+.entry-button.active {
+  border-color: #8ba7ff;
+  background: rgba(105, 126, 221, .14);
+}
+
+.reorder-hint {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 4px 10px;
+}
+
+.entry-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: grab;
+  transition: opacity .15s, transform .15s, border-color .15s;
+}
+
+.entry-button:active { cursor: grabbing; }
+.entry-button.dragging { opacity: .35; }
+.entry-button.drop-before { box-shadow: 0 -3px 0 #9b8aff; }
+.entry-button.drop-after { box-shadow: 0 3px 0 #9b8aff; }
+.drag-handle { color: #8fa0c8; font-size: 20px; line-height: 1; flex: none; }
+.entry-copy { min-width: 0; }
+.entry-copy strong,
+.entry-copy small { display: block; }
+
+.site-config { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(139, 167, 255, .05); }
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #8c86ee;
+  box-shadow: 0 0 0 3px rgba(124, 111, 229, .18);
+}
+
+#metaEditor {
+  min-height: min(680px, 72vh);
+  padding: clamp(18px, 2.5vw, 32px);
+}
+
+#metaEditor .fields {
+  grid-template-rows: auto minmax(440px, 1fr);
+  height: 100%;
+}
+
+#metaEditor .field:not(.wide) {
+  min-height: 440px;
+}
+
+#metaEditor textarea {
+  min-height: 410px;
+  height: 100%;
+  line-height: 1.65;
+  padding: 14px;
+}
+
+@media (max-width: 800px) {
+  #metaEditor { min-height: auto; }
+  #metaEditor .fields { grid-template-rows: auto; }
+  #metaEditor .field:not(.wide),
+  #metaEditor textarea { min-height: 300px; }
+  .site-config { grid-template-columns: 1fr; }
+}

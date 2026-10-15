@@ -1355,8 +1355,10 @@
       function getTriLabels(p) {
         return p.triLabels?.length === 3 ? p.triLabels : ["OFF", "ON", "BETA"];
       }
-      function cycleTriState(s) {
-        return s === "off" ? "stable" : s === "stable" ? "beta" : "off";
+      function cycleTriState(s, lockedOff = false) {
+        if (s === "off") return "stable";
+        if (s === "stable") return "beta";
+        return lockedOff ? "stable" : "off";
       }
       function getLang() {
         return pcmLang() || window.Liko.__Sys_i18n__?.detectLang() || "EN";
@@ -2638,7 +2640,10 @@
           if (!plugin) return;
           const states = ["off", ...plugin.fusamVersions.map((v) => v.distribution)];
           const currentIndex = Math.max(0, states.indexOf(plugin.distribution || "off"));
-          const next = states[(currentIndex + 1) % states.length];
+          let next = states[(currentIndex + 1) % states.length];
+          if (next === "off" && isPluginLocked(id)) {
+            next = states.find((s) => s !== "off") || next;
+          }
           if (plugin.enabled && next === "off" && isPluginLocked(id)) {
             showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
             return;
@@ -2760,7 +2765,7 @@
           const plugin = subPlugins.find((p) => p.id === id);
           if (!plugin || !isTriStatePlugin(plugin)) return;
           const cur = src === "account" ? accountPluginSettings[id] || "off" : plugin.state || "off";
-          const next = cycleTriState(cur);
+          const next = cycleTriState(cur, isPluginLocked(id));
           if (src === "account") {
             if (next === "off" && isPluginLocked(id) && accountPluginSettings[id] && accountPluginSettings[id] !== "off") {
               showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");

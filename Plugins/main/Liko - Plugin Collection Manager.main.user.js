@@ -2294,9 +2294,7 @@
         const selected = availableVersions.find((v) => v.distribution === requestedDistribution) || (saved === true ? availableVersions[0] : null);
         const manifestType = String(addon?.type || "").toLowerCase();
         const pluginId = `fusam:${String(addon?.id || "")}`;
-        // === ДОБАВЛЕНО: если плагин включён при загрузке — блокируем его ===
         if (selected) { lockedPlugins.add(pluginId); saveLockedPlugins(); }
-        // =====================================================================
         return {
           ...addon,
           id: pluginId,
@@ -2755,7 +2753,7 @@
           }
           return;
         }
-        const tri = e.target.closest(".bc-plugin-toggle-tri");
+                const tri = e.target.closest(".bc-plugin-toggle-tri");
         if (tri) {
           const id = tri.getAttribute("data-plugin-tri");
           const src = tri.getAttribute("data-source") || "local";
@@ -2764,6 +2762,10 @@
           const cur = src === "account" ? accountPluginSettings[id] || "off" : plugin.state || "off";
           const next = cycleTriState(cur);
           if (src === "account") {
+            if (next === "off" && isPluginLocked(id) && accountPluginSettings[id] && accountPluginSettings[id] !== "off") {
+              showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+              return;
+            }
             if (next === "off") delete accountPluginSettings[id];
             else accountPluginSettings[id] = next;
             saveAccountSettings();
@@ -2781,12 +2783,12 @@
           tri.setAttribute("data-state", next);
           const item = tri.closest(".bc-plugin-item");
           item.classList.remove("enabled", "beta-enabled");
-          if (next === "stable") item.classList.add("enabled");
-          if (next === "beta") item.classList.add("beta-enabled");
+          if (next === "stable" || next === "en") item.classList.add("enabled");
+          if (next === "beta" || next === "zh" || next === "dev") item.classList.add("beta-enabled");
           const labels = getTriLabels(plugin);
           showToggleNotification(
-            next === "off" ? "🐾" : next === "stable" ? "🐈‍⬛" : "🧪",
-            next === "off" ? `${getPluginName(plugin)} ${t("pluginDisabled")}` : `${getPluginName(plugin)} ${labels[next === "stable" ? 1 : 2]} ${t("pluginEnabled")}`,
+            next === "off" ? "🐾" : "🐈‍⬛",
+            next === "off" ? `${getPluginName(plugin)} ${t("pluginDisabled")}` : `${getPluginName(plugin)} ${t("pluginEnabled")}`,
             next === "off" ? t("willNotStart") : t("willTakeEffect")
           );
           setPluginRuntime(id, { reloadRequired: next === "off" && loadedPlugins.has(id) });

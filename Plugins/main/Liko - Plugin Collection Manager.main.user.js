@@ -1009,6 +1009,20 @@
         }
       }
       let pluginSettings = loadSettings();
+      const LOCKED_PLUGINS_KEY = "pcm_locked_plugins";
+      let lockedPlugins = new Set();
+      try {
+        const stored = JSON.parse(localStorage.getItem(LOCKED_PLUGINS_KEY) || "[]");
+        if (Array.isArray(stored)) lockedPlugins = new Set(stored);
+      } catch (e) {}
+      function saveLockedPlugins() {
+        try {
+          localStorage.setItem(LOCKED_PLUGINS_KEY, JSON.stringify([...lockedPlugins]));
+        } catch (e) {}
+      }
+      function isPluginLocked(pluginId) {
+        return lockedPlugins.has(pluginId);
+      }
       let accountPluginSettings = {};
       let accountSettingsLoaded = false;
       let accountSettingsLoadPromise = null;
@@ -1193,6 +1207,10 @@
           if (isTriStatePlugin(plugin)) plugin.state = saved !== void 0 ? saved : "off";
           else plugin.enabled = saved !== void 0 ? saved : false;
           if (pluginSettings[`${plugin.id}_customIcon`]) plugin.customIcon = pluginSettings[`${plugin.id}_customIcon`];
+          const isEnabled = isTriStatePlugin(plugin)
+            ? (plugin.state === "stable" || plugin.state === "beta")
+            : plugin.enabled;
+          if (isEnabled) lockedPlugins.add(plugin.id);
           return plugin;
         });
       }
@@ -2155,6 +2173,8 @@
             .bc-plugin-item { min-height:0; padding:8px 9px; }
             .bc-plugin-icon { width:44px; height:44px; flex-basis:44px; }
         }
+        .bc-plugin-item.locked { opacity: 0.85; border-style: dashed; }
+        .bc-plugin-item.locked .bc-plugin-toggle { cursor: not-allowed; opacity: 0.6; }
         `;
         document.head.appendChild(style);
       }
@@ -2171,7 +2191,7 @@
         }
         isBeta = source === "fusam" ? plugin.distribution === "beta" || plugin.distribution === "dev" : isTri && currentState === "beta";
         const runtime = pluginRuntime.get(plugin.id) || { status: "idle" };
-        item.className = `bc-plugin-item${isEnabled && !isBeta ? " enabled" : ""}${isBeta ? " beta-enabled" : ""}${failedPlugins.has(plugin.id) ? " failed" : ""}${runtime.postLoadError ? " runtime-warning" : ""}`;
+        const locked = isPluginLocked(plugin.id) && isEnabled; item.className = `bc-plugin-item${isEnabled && !isBeta ? " enabled" : ""}${isBeta ? " beta-enabled" : ""}${failedPlugins.has(plugin.id) ? " failed" : ""}${runtime.postLoadError ? " runtime-warning" : ""}${locked ? " locked" : ""}`;
         item.setAttribute("data-plugin-id", plugin.id);
         const isHttpsUrl = (u) => typeof u === "string" && /^https:\/\//i.test(u);
         const iconUrl = isHttpsUrl(plugin.customIcon) ? plugin.customIcon : isHttpsUrl(plugin.icon) ? plugin.icon : null;
@@ -2194,6 +2214,12 @@
           if (fallback) fallback.hidden = false;
         }, { once: true });
         if (failedPlugins.has(plugin.id)) showPluginRetryBtn(plugin.id, item);
+        if (locked) {
+          const lock = document.createElement("span");
+          lock.textContent = "🔒";
+          lock.style.cssText = "position:absolute;top:8px;right:8px;font-size:14px;opacity:0.7;z-index:3;pointer-events:none;";
+          item.appendChild(lock);
+        }
         return item;
       }
       function buildAccountContent(container) {
@@ -2659,38 +2685,58 @@
           if (!plugin) return;
           if (src === "account") {
             const newVal = !isPluginEnabledInAccount(plugin);
+            if (!newVal && isPluginEnabledInAccount(plugin) && isPluginLocked(id)) {
+              showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+              return;
+            }
             if (newVal) accountPluginSettings[id] = 1;
             else delete accountPluginSettings[id];
             saveAccountSettings();
+            if (newVal) { lockedPlugins.add(id); saveLockedPlugins();}
             toggle.classList.toggle("active", newVal);
             toggle.closest(".bc-plugin-item").classList.toggle("enabled", newVal);
             showToggleNotification(newVal ? "🐈‍⬛" : "🐾", `${getPluginName(plugin)} ${newVal ? t("pluginEnabled") : t("pluginDisabled")}`, newVal ? t("willTakeEffect") : t("willNotStart"));
             setPluginRuntime(id, { reloadRequired: !newVal && loadedPlugins.has(id) });
             if (newVal && !loadedPlugins.has(id) && typeof Player !== "undefined") loadSubPlugin(plugin, "account").catch(() => {
             });
-          } else if (src === "custom") {
-            plugin.enabled = !plugin.enabled;
-            saveCustomPlugins();
+          } } else if (src === "custom") {
+              if (plugin.enabled && isPluginLocked(id)) {
+                showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+                return;
+              }
+              plugin.enabled = !plugin.enabled;
+              saveCustomPlugins();
+              if (plugin.enabled) { lockedPlugins.add(id); saveLockedPlugins(); }
             toggle.classList.toggle("active", plugin.enabled);
             toggle.closest(".bc-plugin-item").classList.toggle("enabled", plugin.enabled);
             showToggleNotification(plugin.enabled ? "🐈‍⬛" : "🐾", `${plugin.name} ${plugin.enabled ? t("pluginEnabled") : t("pluginDisabled")}`, plugin.enabled ? t("willTakeEffect") : t("willNotStart"));
             setPluginRuntime(id, { reloadRequired: !plugin.enabled && loadedPlugins.has(id) });
             if (plugin.enabled && !loadedPlugins.has(id)) loadSubPlugin(plugin, "custom").catch(() => {
             });
-          } else if (src === "fusam") {
-            plugin.enabled = !plugin.enabled;
-            fusamPluginSettings[plugin.fusamId] = plugin.enabled;
-            saveFusamPluginSettings();
+          } } else if (src === "fusam") {
+              if (plugin.enabled && isPluginLocked(id)) {
+                showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+                return;
+              }
+              plugin.enabled = !plugin.enabled;
+              fusamPluginSettings[plugin.fusamId] = plugin.enabled;
+              saveFusamPluginSettings();
+              if (plugin.enabled) { lockedPlugins.add(id); saveLockedPlugins(); }
             toggle.classList.toggle("active", plugin.enabled);
             toggle.closest(".bc-plugin-item").classList.toggle("enabled", plugin.enabled);
             showToggleNotification(plugin.enabled ? "🐈‍⬛" : "🐾", `${getPluginName(plugin)} ${plugin.enabled ? t("pluginEnabled") : t("pluginDisabled")}`, plugin.enabled ? t("willTakeEffect") : t("willNotStart"));
             setPluginRuntime(id, { reloadRequired: !plugin.enabled && loadedPlugins.has(id) });
             if (plugin.enabled && !loadedPlugins.has(id)) loadSubPlugin(plugin, "fusam").catch(() => {
             });
-          } else {
+          } } else {
+            if (plugin.enabled && isPluginLocked(id)) {
+              showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+              return;
+            }
             plugin.enabled = !plugin.enabled;
             pluginSettings[id] = plugin.enabled;
             saveSettings(pluginSettings);
+            if (plugin.enabled) { lockedPlugins.add(id); saveLockedPlugins(); }
             toggle.classList.toggle("active", plugin.enabled);
             toggle.closest(".bc-plugin-item").classList.toggle("enabled", plugin.enabled);
             showToggleNotification(plugin.enabled ? "🐈‍⬛" : "🐾", `${getPluginName(plugin)} ${plugin.enabled ? t("pluginEnabled") : t("pluginDisabled")}`, plugin.enabled ? t("willTakeEffect") : t("willNotStart"));
@@ -2713,9 +2759,15 @@
             else accountPluginSettings[id] = next;
             saveAccountSettings();
           } else {
+            const wasOn = plugin.state === "stable" || plugin.state === "beta";
+            if (wasOn && next === "off" && isPluginLocked(id)) {
+              showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
+              return;
+            }
             plugin.state = next;
             pluginSettings[id] = next;
             saveSettings(pluginSettings);
+            if (next === "stable" || next === "beta") { lockedPlugins.add(id); saveLockedPlugins(); }
           }
           tri.setAttribute("data-state", next);
           const item = tri.closest(".bc-plugin-item");

@@ -2699,7 +2699,7 @@
             setPluginRuntime(id, { reloadRequired: !newVal && loadedPlugins.has(id) });
             if (newVal && !loadedPlugins.has(id) && typeof Player !== "undefined") loadSubPlugin(plugin, "account").catch(() => {
             });
-          } } else if (src === "custom") {
+          } else if (src === "custom") {
               if (plugin.enabled && isPluginLocked(id)) {
                 showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
                 return;

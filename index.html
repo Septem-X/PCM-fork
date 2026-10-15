@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Liko 的 Bondage Club 插件收藏庫：探索聊天室、外觀、互動、媒體與工具插件。">
+  <meta name="theme-color" content="#120f1e">
+  <title>Liko Plugin Repository</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0b14;
+      --panel: rgba(27, 23, 42, .82);
+      --panel-strong: #211b34;
+      --line: rgba(196, 181, 253, .16);
+      --text: #f5f1ff;
+      --muted: #aaa2bc;
+      --violet: #a78bfa;
+      --pink: #f0abfc;
+      --cyan: #67e8f9;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .35);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 14% 4%, rgba(124, 58, 237, .24), transparent 30rem),
+        radial-gradient(circle at 88% 24%, rgba(217, 70, 239, .12), transparent 25rem),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    .shell { width: min(1180px, calc(100% - 32px)); margin: auto; }
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 1px solid var(--line);
+      background: rgba(13, 11, 20, .76);
+      backdrop-filter: blur(18px);
+    }
+    .nav { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; letter-spacing: -.02em; }
+    .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 13px; background: var(--panel); }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .nav-link, .lang-button {
+      border: 1px solid var(--line); border-radius: 999px; padding: 9px 13px;
+      color: var(--muted); background: rgba(255,255,255,.025); text-decoration: none; cursor: pointer;
+    }
+    .nav-link:hover, .lang-button:hover { color: var(--text); border-color: rgba(167,139,250,.55); }
+    .hero { padding: 78px 0 54px; text-align: center; }
+    .pcm-icon { width: clamp(118px, 18vw, 168px); height: auto; margin-bottom: 22px; filter: drop-shadow(0 20px 38px rgba(124,58,237,.34)); }
+    .eyebrow { margin: 0 0 16px; color: var(--cyan); font-size: .78rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { max-width: 980px; margin: 0 auto; font-size: clamp(2.7rem, 7vw, 6rem); line-height: .96; letter-spacing: -.06em; }
+    .gradient { color: transparent; background: linear-gradient(110deg, var(--violet), var(--pink) 55%, var(--cyan)); background-clip: text; }
+    .lead { max-width: 720px; margin: 25px auto 0; color: var(--muted); font-size: clamp(1.05rem, 2.2vw, 1.35rem); line-height: 1.7; }
+    .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px; }
+    .hero-actions .button { min-height: 48px; padding-inline: 20px; }
+    .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
+    .stat { min-width: 132px; padding: 15px 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+    .stat strong { display: block; font-size: 1.55rem; }
+    .stat span { color: var(--muted); font-size: .82rem; }
+    .catalog { padding: 42px 0 86px; }
+    .catalog-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+    h2 { margin: 0; font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -.045em; }
+    .result-count { color: var(--muted); }
+    .controls { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 12px; margin-bottom: 18px; }
+    .search { width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 15px; padding: 0 17px; color: var(--text); background: var(--panel); outline: none; }
+    .search:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(167,139,250,.13); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filter { border: 1px solid var(--line); border-radius: 14px; padding: 0 15px; color: var(--muted); background: var(--panel); cursor: pointer; }
+    .filter:hover, .filter.active { color: #120f1e; border-color: var(--violet); background: var(--violet); }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .card {
+      display: flex; flex-direction: column; min-height: 285px; padding: 22px;
+      border: 1px solid var(--line); border-radius: 23px; background: linear-gradient(155deg, rgba(35,29,55,.9), rgba(22,18,34,.84));
+      box-shadow: 0 1px 0 rgba(255,255,255,.025) inset; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .card:hover { transform: translateY(-4px); border-color: rgba(167,139,250,.48); box-shadow: var(--shadow); }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .icon { display: grid; place-items: center; flex: 0 0 auto; width: 50px; height: 50px; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.04); font-size: 1.5rem; overflow: hidden; }
+    .icon img { width: 100%; height: 100%; object-fit: cover; }
+    .version { color: var(--cyan); font: 700 .73rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .card h3 { margin: 18px 0 6px; font-size: 1.18rem; line-height: 1.35; }
+    .en-name { min-height: 1.2em; margin: 0 0 14px; color: var(--muted); font-size: .8rem; }
+    .description { margin: 0; color: #d5cee2; line-height: 1.65; }
+    .extra { margin: 12px 0 0; padding: 10px 12px; border-left: 2px solid var(--pink); color: var(--muted); background: rgba(240,171,252,.05); font-size: .86rem; line-height: 1.5; }
+    .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+    .chip { border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; color: var(--muted); font-size: .72rem; }
+    .card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 20px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border: 1px solid var(--line); border-radius: 12px; padding: 0 13px; color: var(--text); text-decoration: none; font-size: .88rem; font-weight: 750; }
+    .button.primary { color: #130f1e; border-color: var(--violet); background: linear-gradient(120deg, var(--violet), var(--pink)); }
+    .button:hover { filter: brightness(1.1); }
+    .empty { grid-column: 1 / -1; padding: 64px 20px; border: 1px dashed var(--line); border-radius: 22px; color: var(--muted); text-align: center; }
+    .install { padding: 20px 0 72px; }
+    .install-box { display: grid; grid-template-columns: 1.2fr .8fr; gap: 24px; padding: 30px; border: 1px solid var(--line); border-radius: 27px; background: var(--panel); }
+    .install p { color: var(--muted); line-height: 1.7; }
+    .install-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+    .methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .method { padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: rgba(27,23,42,.58); }
+    .method h3 { margin: 0 0 8px; }
+    .method p { margin: 0; font-size: .9rem; }
+    details { margin-top: 14px; }
+    summary { color: var(--violet); cursor: pointer; font-weight: 700; }
+    pre { margin: 12px 0 0; padding: 13px; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; color: #ddd6fe; background: #0b0911; font: .72rem/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+    footer { padding: 24px 0 42px; border-top: 1px solid var(--line); color: var(--muted); font-size: .86rem; }
+    footer .shell { display: flex; justify-content: space-between; gap: 18px; }
+    @media (max-width: 920px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } .install-box { grid-template-columns: 1fr; } .install-actions { justify-content: flex-start; } .methods { grid-template-columns: 1fr; } }
+    @media (max-width: 650px) { .shell { width: min(100% - 22px, 1180px); } .nav-link.hide-mobile { display: none; } .hero { padding-top: 66px; } .controls { grid-template-columns: 1fr; } .filters { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; } .filter { min-height: 42px; white-space: nowrap; } .grid { grid-template-columns: 1fr; } .catalog-head { align-items: start; flex-direction: column; gap: 8px; } footer .shell { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="shell nav" aria-label="主選單">
+      <a class="brand" href="#top"><span class="brand-mark">🐈‍⬛</span><span>Liko Plugins</span></a>
+      <div class="nav-actions">
+        <a class="nav-link hide-mobile" href="#install" data-t="navInstall">安裝</a>
+        <a class="nav-link hide-mobile" href="#plugins" data-t="navPlugins">插件</a>
+        <a class="nav-link" href="https://github.com/awdrrawd/liko-Plugin-Repository" target="_blank" rel="noreferrer">GitHub ↗</a>
+        <button class="lang-button" id="language" type="button" aria-label="Switch language">EN</button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <img class="pcm-icon" src="Images/PCM_ICON.png" alt="PCM">
+      <p class="eyebrow" data-t="eyebrow">Liko 的插件管理器</p>
+      <h1>Plugin Collection<br><span class="gradient">Manager</span></h1>
+      <p class="lead" data-t="lead">集中安裝、啟用與管理 Bondage Club 插件。推薦先安裝 PCM，再從收藏庫挑選你需要的功能。</p>
+      <div class="hero-actions">
+        <a class="button primary" href="https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js" data-t="installNow">立即安裝 PCM</a>
+        <a class="button" href="#install" data-t="otherMethods">其他安裝方式</a>
+      </div>
+      <div class="stats" aria-label="插件統計">
+        <div class="stat"><strong>43</strong><span data-t="statAll">全部插件</span></div>
+        <div class="stat"><strong>32</strong><span data-t="statLiko">Liko 插件</span></div>
+        <div class="stat"><strong>8</strong><span data-t="statCommunity">社群插件</span></div>
+        <div class="stat"><strong>3</strong><span data-t="statHotfix">修正補丁</span></div>
+      </div>
+    </section>
+
+    <section class="install shell" id="install">
+      <div class="install-box">
+        <div>
+          <p class="eyebrow" data-t="installEyebrow">推薦安裝方式</p>
+          <h2 data-t="installTitle">先安裝 PCM，再選擇插件。</h2>
+          <p data-t="installText">使用 Tampermonkey、Violentmonkey 或 Userscripts 開啟安裝連結。進入遊戲後輸入 /pcm help 查看說明，或使用 /pcm list 查看插件狀態。</p>
+        </div>
+        <div class="install-actions">
+          <a class="button primary" href="https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js" data-t="installPcm">安裝 PCM</a>
+          <a class="button" href="https://github.com/awdrrawd/liko-Plugin-Repository" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div class="methods">
+        <article class="method">
+          <h3 data-t="bookmarkTitle">🔖 書籤載入</h3>
+          <p data-t="bookmarkText">不使用腳本管理器時，可建立一個載入 PCM 的書籤。</p>
+          <details><summary data-t="showCode">顯示程式碼</summary><pre>javascript:(function(){var s=document.createElement('script');s.src='https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js?'+Date.now();s.type='text/javascript';s.crossOrigin='anonymous';document.head.appendChild(s)})();</pre></details>
+        </article>
+        <article class="method">
+          <h3 data-t="consoleTitle">⌨️ 控制台載入</h3>
+          <p data-t="consoleText">開啟開發者工具，在 Console 貼上載入指令。</p>
+          <details><summary data-t="showCode">顯示程式碼</summary><pre>import(`https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js?v=${(Date.now()/10000).toFixed(0)}`);</pre></details>
+        </article>
+        <article class="method">
+          <h3 data-t="singleTitle">🧩 單獨安裝</h3>
+          <p data-t="singleText">不使用 PCM 時，仍可從插件卡片直接安裝個別腳本。</p>
+          <div class="card-actions"><a class="button" href="#plugins" data-t="browsePlugins">瀏覽插件</a></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="catalog shell" id="plugins">
+      <div class="catalog-head">
+        <div><p class="eyebrow" data-t="catalogEyebrow">完整收藏</p><h2 data-t="catalogTitle">探索插件</h2></div>
+        <div class="result-count" id="result-count"></div>
+      </div>
+      <div class="controls">
+        <input class="search" id="search" type="search" autocomplete="off" data-placeholder="search" placeholder="搜尋名稱、功能或 ID…">
+        <div class="filters" role="group" aria-label="插件分類">
+          <button class="filter active" type="button" data-filter="all" data-t="filterAll">全部</button>
+          <button class="filter" type="button" data-filter="liko" data-t="filterLiko">Liko</button>
+          <button class="filter" type="button" data-filter="community" data-t="filterCommunity">社群</button>
+          <button class="filter" type="button" data-filter="hotfix" data-t="filterHotfix">補丁</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+  </main>
+
+  <footer><div class="shell"><span>© Liko Plugin Repository</span><span>MIT License</span></div></footer>
+
+  <script>
+    const plugins = [{"id":"HT-QI","name":"BC 快捷互动插件","enName":"BC quick-interaction","description":"快捷互动插件，提供部位直选、批量执行、动作收藏、连招编排、ECHO動作匯出、自訂動作","enDescription":"quick-interaction plugins offer features such as direct selection of body parts, batch execution, action collection, combo choreography, ECHO action export, and custom actions.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"","emoji":"⚡","url":"https://bondage-studio.github.io/QuickInteraction/assets/main.js","website":"https://github.com/bondage-studio/QuickInteraction","category":"community","tags":["chat","Interaction"]},{"id":"Liko-LCE","name":"Liko的俱樂部擴充(測試)","enName":"Liko's Club Expansion(test)","description":"以WCE為基底合併幾個小型插件功能，並提供美化登入介面與帳號記憶功能","enDescription":"Based on WCE, merge several small plugin features, and provide a beautified login interface with account memory functionality.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"","emoji":"✨","url":"https://cdn.jsdelivr.net/gh/awdrrawd/BC-LCE@main/dist/assets/main.js","website":"https://github.com/awdrrawd/BC-LCE","category":"liko","tags":["ui","enhancements"]},{"id":"Liko-AEE","name":"Liko的外觀編輯拓展(測試中)","enName":"Liko's Appearance editing extension(testing)","description":"更強大的編輯器，並且支援更多的服裝編輯(測試中)","enDescription":"A more powerful editor, and support for more clothing editing.(testing)","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/BC-AEE@main/public/AEE_icon.jpg","emoji":"🐈‍⬛","url":"https://awdrrawd.github.io/BC-AEE/assets/main.js","website":"https://github.com/awdrrawd/BC-AEE/tree/main","category":"liko","tags":["appearance","ui","enhancements"]},{"id":"Liko-Responsive","name":"Liko的熱情回應","enName":"Liko's Responsive Reactions","description":"依互動、高潮、趣味與房間事件，自動執行文字、動作、表情與特殊動畫回應。","enDescription":"Automatically responds to interactions, climax, flavour, and room events with messages, activities, expressions, and special animations.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"https://awdrrawd.github.io/BC-Responsive/assets/preference-icon.svg","emoji":"💗","url":"https://awdrrawd.github.io/BC-Responsive/dist/main.js","website":"https://github.com/awdrrawd/BC-Responsive","category":"liko","tags":["chat","Interaction","immersion"]},{"id":"Liko-AFC","name":"繁戀如花 ─繽紛─","enName":"Abundantia Florum ─Chromatica─","description":"更多戀人，如百花盛放的愛情篇章，並搭載可延展的戀人鎖機制。","enDescription":"An abundance of lovers, like a love story blooming in countless flowers, featuring an extensible Lover’s Lock system.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/BC-AFC@main/Images/AFC-ICON.png","emoji":"🌸","url":"https://awdrrawd.github.io/BC-AFC/assets/main.js","website":"https://github.com/awdrrawd/BC-AFC","category":"liko","tags":["social"]},{"id":"Liko-FCM","name":"Liko的好友與房間管理","enName":"Friends and ChatRoom Manager","description":"更好的好友管理與房間管理功能","enDescription":"Improved friend and room management features.","additionalInfo":"提供個人資料的保存、查詢，房間名單的管理","enAdditionalInfo":"Provides features for saving and searching personal profiles, and managing room lists.","version":"","icon":"","emoji":"👥","url":"https://awdrrawd.github.io/BC-FCM/assets/main.js","website":"https://github.com/awdrrawd/BC-FCM","category":"liko","tags":["social","management"]},{"id":"Liko-HSC","name":"催眠奴隸俱樂部","enName":"Hypnotic Slave Club","description":"提供多樣催眠效果，增強催眠的沉浸度","enDescription":"Provides a variety of hypnosis effects to enhance the immersion of the experience.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/BC-HSC@main/Assets/Icon/HSC-iconB2.png","emoji":"🌀","url":"https://awdrrawd.github.io/BC-HSC/assets/main.js","website":"https://github.com/awdrrawd/BC-HSC","category":"liko","tags":["social","immersion"]},{"id":"Liko-CHE","name":"Liko的聊天室書記官","enName":"Liko's Chat History Exporter","description":"聊天室信息轉HTML，並且提供最多7天的信息救援(需要手動啟用緩存功能)","enDescription":"Convert chat history to HTML and provides message recovery for up to 7 days.(The caching feature requires manual activation.)","additionalInfo":"包含完整的聊天記錄、時間戳和角色信息，可以搭配Neocities等網站上傳分享","enAdditionalInfo":"Includes complete chat logs, timestamps and character info, compatible with sites like Neocities for sharing","version":"2.6.1","icon":"","emoji":"📖","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CHE.main.user.js","website":"","category":"liko","tags":["chat","tool"]},{"id":"Liko-Image_Uploader","name":"Liko的圖片上傳器","enName":"Liko's Image Uploader","description":"拖曳上傳圖片並分享到聊天室","enDescription":"Drag and drop image upload and share to chatroom","additionalInfo":"圖片上傳失敗時，可以使用/IMG或/IMG HELP查閱說明","enAdditionalInfo":"If the image fails to upload, you can use /IMG or /IMG HELP to view the instructions.","version":"1.6.3","icon":"","emoji":"🖼️","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Image%20Uploader.main.user.js","website":"","category":"liko","tags":["chat","media"]},{"id":"Liko-MAT","name":"Liko的自動翻譯","enName":"Liko's Messages Auto Translator","description":"自動翻譯(使用Google api)","enDescription":"Auto translate BC chat messages using Google API","additionalInfo":"","enAdditionalInfo":"","version":"1.7.12","icon":"","emoji":"🌐","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20MAT.main.user.js","website":"","category":"liko","tags":["chat","tool","translation"]},{"id":"Liko-Tool","name":"Liko的工具包","enName":"Liko's Tool Kit","description":"有許多小功能合集的工具包，但也有點不穩定","enDescription":"A collection of small utility functions, but somewhat unstable","additionalInfo":"詳細使用說明請輸入/LT或/LT help查詢","enAdditionalInfo":"For detailed usage instructions, please enter /LT or /LT help.","version":"2.3.3","icon":"","emoji":"🧰","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Tool.main.user.js","website":"","category":"liko","tags":["tool","cheat"]},{"id":"Liko-ACV","name":"Liko的自動創建影片","enName":"Liko's Automatically create video.","description":"Liko的自動創建影片","enDescription":"Liko's Automatically create video.","additionalInfo":"","enAdditionalInfo":"","version":"1.5.3","icon":"","emoji":"🎬","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20ACV.main.user.js","website":"","category":"liko","tags":["chat","media"]},{"id":"Liko-Kaomoji","name":"文字表情","enName":"Kaomoji","description":"文字表情快捷面板，並提供自訂、常用快捷分類","enDescription":"Quick-access text emoji panel with custom and frequently-used categories.","additionalInfo":"","enAdditionalInfo":"","version":"1.2.0","icon":"","emoji":"😀","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Kaomoji.main.user.js","website":"","category":"liko","tags":["chat"]},{"id":"Liko-BMM","name":"Liko的地圖房迷你地圖","enName":"Liko's Bondage Map Minimap","description":"BC 地圖房迷你地圖","enDescription":"BC map room minimap","additionalInfo":"","enAdditionalInfo":"","version":"2.0.1","icon":"","emoji":"🗺️","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20BMM.main.user.js","website":"","category":"liko","tags":["chat","map","cheat"]},{"id":"Liko-CRA","name":"聊天室輔助工具","enName":"ChatRoom Assistant","description":"替他人改姿勢、輸入歷史、BIO時區頭頂時間、@動作自帶名字、指令/房間轉按鈕","enDescription":"Change pose for others, input history, timezone display above head in BIO, @actions with auto-name inclusion, command /room converted to button.","additionalInfo":"","enAdditionalInfo":"","version":"1.0.3","icon":"","emoji":"🔧","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CRA.main.user.js","website":"","category":"liko","tags":["chat","tool"]},{"id":"Liko-Prank","name":"Liko對朋友的惡作劇","enName":"Liko's Friend Prank","description":"內褲大盜鬧得BC社群人心惶惶！","enDescription":"The underwear thief causing panic in the BC community!","additionalInfo":"注意：這是個惡作劇插件，請謹慎使用！指令 /偷取, /溶解, /传送","enAdditionalInfo":"Warning: This is a prank plugin, use with caution! Command /Steal, /dissolve, /Teleport","version":"1.6.9","icon":"","emoji":"🪄","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Prank.main.user.js","website":"","category":"liko","tags":["fun"]},{"id":"Liko-CDB","name":"Liko的自訂更衣室背景","enName":"Liko's Custom Dressing Background","description":"更衣室背景替換，並提供網格對焦與替換姿勢","enDescription":"Replace the wardrobe background with a grid-based focus assist and pose change function.","additionalInfo":"","enAdditionalInfo":"","version":"1.5.3","icon":"","emoji":"👗","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CDB.main.user.js","website":"","category":"liko","tags":["appearance"]},{"id":"Liko-CMC","name":"Liko的聊天室音樂控制器(測試中)","enName":"Liko's Music Controller(testing)","description":"支援歌詞(需要有曲名)、歌曲列表","enDescription":"Supports lyrics (must have song title) and song list.","additionalInfo":"","enAdditionalInfo":"","version":"1.4.1","icon":"","emoji":"🎵","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CMC.main.user.js","website":"","category":"liko","tags":["media","chat"]},{"id":"Liko-MPL","name":"手機直版佈局(測試)","enName":"Mobile Portrait Layout(test)","description":"支援房間搜尋與聊天室的直版佈局","enDescription":"Supports vertical layout for ChatSearch and ChatRoom.","additionalInfo":"","enAdditionalInfo":"","version":"0.5.5","icon":"","emoji":"📱","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20MPL.main.user.js","website":"","category":"liko","tags":["ui","mobile"]},{"id":"Liko-NOI","name":"Liko的邀請通知器","enName":"Liko's Notification of Invites","description":"發出好友、白單、黑單的信息!","enDescription":"Customize the notification message when sending a friend, whitelist, or blacklist request.","additionalInfo":"","enAdditionalInfo":"","version":"1.1","icon":"","emoji":"📧","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20NOI.main.user.js","website":"","category":"liko","tags":["social"]},{"id":"Liko-WPS","name":"WCE的個人資料分享","enName":"WCE Profile Share.","description":"WCE的個人資料分享，需開啟WCE的個人資料保存","enDescription":"WCE Profile Share, need to enable WCE profile saving.","additionalInfo":"","enAdditionalInfo":"","version":"1.1.4","icon":"","emoji":"🆔","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20WPS.main.user.js","website":"","category":"liko","tags":["social"]},{"id":"Liko-Region_switch","name":"快速切換混合&女性區","enName":"Region switch","description":"快速切換混合&女性區","enDescription":"Region switch","additionalInfo":"","enAdditionalInfo":"","version":"1.3.1","icon":"","emoji":"⚧️","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Region%20switch.main.user.js","website":"","category":"liko","tags":["tool"]},{"id":"Liko-TRC","name":"Liko的玩具遙控器","enName":"Liko's Toy remote control","description":"聊天室玩具控制","enDescription":"Chat room Toy remote control","additionalInfo":"","enAdditionalInfo":"","version":"1.1.1","icon":"","emoji":"🎮","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20TRC.main.user.js","website":"","category":"liko","tags":["chat","toy","cheat"]},{"id":"Liko-CFT","name":"聊天室信息過濾器","enName":"RChat Filter Tool","description":"聊天室信息過濾","enDescription":"Chat room message filtering","additionalInfo":"","enAdditionalInfo":"","version":"1.1.4","icon":"","emoji":"📋","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CFT.main.user.js","website":"","category":"liko","tags":["chat","tool"]},{"id":"Liko-BDG","name":"你畫我猜(測試)","enName":"Draw Game(test)","description":"可以在聊天室隨意塗鴉","enDescription":"Can doodle freely in the chat room.","additionalInfo":"","enAdditionalInfo":"","version":"0.3.0","icon":"","emoji":"🫟","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko-BDG.main.user.js","website":"","category":"liko","tags":["chat","fun"]},{"id":"Liko-CPB","name":"Liko的自定義個人資料頁面背景","enName":"Liko's Custom Profile Background","description":"自定義個人資料頁面背景並分享給他人","enDescription":"Customize profile page background and share it with others.","additionalInfo":"","enAdditionalInfo":"","version":"1.2.4","icon":"","emoji":"🪪","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20CPB.main.user.js","website":"","category":"liko","tags":["appearance","social"]},{"id":"Liko-Chat_TtoB","name":"Liko的對話變按鈕","enName":"Liko's Chat Text to Button","description":"聊天室信息轉按鈕，現在還多了傳送門功能!","enDescription":"Convert chat messages to buttons, now with portal feature!","additionalInfo":"使用/指令、!!說話、#房名#都會變成可以點擊的按鈕，#房名#提供傳送功能","enAdditionalInfo":"Commands starting with /, !! for speech, and #RoomName# will become clickable buttons. The #RoomName# button provides a teleport function.","version":"1.1.1-1","icon":"","emoji":"💬","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Chat%20TtoB.main.user.js","website":"","category":"liko","tags":["chat","tool"]},{"id":"Liko-BTP","name":"BC翻譯補丁","enName":"BC-translation-patch","description":"中文的翻譯補丁，補充上遺漏翻譯","enDescription":"Chinese translation supplement, to fill in the missing translations.","additionalInfo":"","enAdditionalInfo":"","version":"0.1.0","icon":"","emoji":"📔","url":"https://awdrrawd.github.io/BC-translation-patch/bc-translation-patch.js","website":"https://github.com/awdrrawd/BC-translation-patch","category":"liko","tags":["translation","tool"]},{"id":"Liko-DDT","name":"繪圖檢測工具","enName":"Draw Detection Tool","description":"偵測 canvas & DOM 物件的屬性，支持染色與位移，並支持繪製物件功能","enDescription":"Detect properties of canvas & DOM objects, support tinting/coloring and displacement, and support object drawing functionality.","additionalInfo":"","enAdditionalInfo":"","version":"0.3.1","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/liko-Plugin-Repository@main/Images/DDT/DDT-icon.png","emoji":"🖌️","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20DDT.main.user.js","website":"","category":"liko","tags":["dev","tool"]},{"id":"Liko-Release_Maid","name":"Liko的解綁女僕","enName":"Liko's Release Maid","description":"自動解綁女僕，不過有點天然，會在意外時觸發!","enDescription":"Auto-release maid, but a bit naive and may trigger unexpectedly!","additionalInfo":"請評估自己需求，避免降低遊戲樂趣","enAdditionalInfo":"Please consider your own needs to avoid diminishing the enjoyment of the game.","version":"1.2-1","icon":"","emoji":"🧹","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20Release%20Maid.main.user.js","website":"","category":"liko","tags":["automation","cheat"]},{"id":"Liko-CUS","name":"聊天室左右介面交換","enName":"Chatroom UI Swap","description":"聊天室左右介面交換：左側聊天訊息、右側人物。手動開關。","enDescription":"Chatroom UI Swap: chat log on the left, characters on the right.","additionalInfo":"","enAdditionalInfo":"","version":"0.1","icon":"","emoji":"📱","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko-CUS.main.user.js","website":"","category":"liko","tags":["ui","mobile"]},{"id":"Liko-LCS","name":"程式碼沙盒","enName":"Code Sandbox","description":"在全域作用域執行測試碼，精準追蹤並還原「這個沙盒自己造成」的副作用；支援多重沙盒、可收合、可切純控制台模式","enDescription":"Execute test code in the global scope, precisely track and restore side effects caused by the sandbox itself; supports multiple sandboxes, collapsible panels, and toggleable pure console mode.","additionalInfo":"","enAdditionalInfo":"","version":"1.0","icon":"","emoji":"🧪","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20LCS.main.user.js","website":"","category":"liko","tags":["tool","cheat","fab"]},{"id":"Liko-TTS","name":"文字轉語音","enName":"Text to Speech","description":"聊天室信息轉語音","enDescription":"Chatroom message to voice conversion","additionalInfo":"","enAdditionalInfo":"","version":"0.6.3","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/liko-Plugin-Repository@main/Images/TTS/TTS-icon.png","emoji":"🔊","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/main/Liko%20-%20TTS.main.user.js","website":"","category":"liko","tags":["accessibility","chat"]},{"id":"ECHO-Cloth","name":"ECHO的服裝拓展","enName":"ECHO's Expansion on cloth options","description":"ECHO的服裝拓展","enDescription":"ECHO's Expansion on cloth options","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"🥐","emoji":"🥐","url":"https://sugarchain-studio.github.io/echo-clothing-ext/bc-cloth.user.js","website":"https://github.com/SugarChain-Studio/echo-clothing-ext","category":"community","tags":[]},{"id":"ECHO-Activity","name":"ECHO的動作拓展","enName":"ECHO's Expansion on activity options","description":"ECHO的動作拓展","enDescription":"ECHO's Expansion on activity options","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"🥐","emoji":"🥐","url":"https://sugarchain-studio.github.io/echo-activity-ext/bc-activity.user.js","website":"https://github.com/SugarChain-Studio/echo-activity-ext","category":"community","tags":[]},{"id":"XS-Activity","name":"小酥的動作拓展","enName":"XS's Expansion on activity options","description":"小酥的動作拓展","enDescription":"XS's Expansion on activity options","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"🍪","emoji":"🍪","url":"https://awdrrawd.github.io/XiaoSuActivity/main/XSActivity.js","website":"https://github.com/iceriny/XiaoSuActivity","category":"community","tags":[]},{"id":"Vivian-PWB","name":"Vivian 的 BC 随身衣柜","enName":"Vivian's Portable Wardrobe for BC.","description":"本脚本为 BC 游戏提供 随身衣柜，内置预览镜和高级服装管理功能。","enDescription":"A BC script that adds a portable wardrobe system with a preview mirror and advanced outfit management.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"👘","emoji":"👘","url":"https://vivianmoonlight.github.io/Vivians-Portable-Wardrobe/ViviansPortableWardrobeLoader.user.js","website":"https://github.com/VivianMoonlight/Vivians-Portable-Wardrobe","category":"community","tags":[]},{"id":"ULTRAbc","name":"ULTRAbc","enName":"ULTRAbc","description":"有許多輔助功能，但考慮遊戲性請自行選擇是否啟用","enDescription":"A large collection of cheats, quality of life improvements, and a moaner script.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"🐇","emoji":"🐇","url":"https://tetris245.github.io/ultrabc.github.io/ULTRAbcloader.user.js","website":"https://github.com/tetris245/ULTRAbc","category":"community","tags":[]},{"id":"GGC","name":"Galia的賭博俱樂部","enName":"Galia's Gambling Club","description":"增加了小遊戲、骰子和硬幣動畫、交易、趣味文字效果以及專為聊天室互動而設計的環形選單。","enDescription":"Addon that adds canvas games, dice and coin animations, trades, playful text effects, and a radial menu built for chat-room interactions.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"🎲","emoji":"🎲","url":"https://galia-bc.github.io/galia.github.io/club-gaming/club-gaming.js","website":"https://galia-bc.github.io/galia.github.io","category":"community","tags":[]},{"id":"Shuang-Assets","name":"Shuang的貼圖分享","enName":"Shuang's sticker sharing","description":"新增貼圖分享物品。可設定貼圖網址，設置在角色身上並分享顯示給其他人","enDescription":"Add sticker item: allows setting a sticker URL, attaching it to a character, and sharing it so that it is visible to others.","additionalInfo":"","enAdditionalInfo":"","version":"","icon":"https://cdn.jsdelivr.net/gh/awdrrawd/ShuangCustomAssets-Mirror@master/assets/SCA_slider.png","emoji":"🧩","url":"https://shuang-custom-assets.pages.dev/assets/main.js","website":"https://gitgud.io/yeshuang26/shuangcustomassets","category":"community","tags":[]},{"id":"Fix-HHA","name":"物件隱藏熱修","enName":"Hotfix for Hidden elements","description":"在更衣室、個人資訊、角色互動中隱藏興奮條、MPA等物件","enDescription":"Hide arousal meters, MPA, and similar elements in the locker room, character info, and interaction menus.","additionalInfo":"","enAdditionalInfo":"","version":"0.4","icon":"💉","emoji":"💉","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/Hotfix/HHA.user.js","website":"","category":"hotfix","tags":[]},{"id":"Fix-HLF","name":"牽引補丁(測試)","enName":"Leash Fix(test)","description":"修復部分牽引失敗的錯誤","enDescription":"Fix some Leash failures","additionalInfo":"","enAdditionalInfo":"","version":"0.17","icon":"💉","emoji":"💉","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/Hotfix/HLF.user.js","website":"","category":"hotfix","tags":[]},{"id":"Fix-HCR","name":"製作物品的擴充物品資產保護","enName":"Crafting Asset Recovery","description":"在擴充資產尚未載入時保留 Craft 物品，並於資產載入後自動恢復使用","enDescription":"Preserves crafted items while extension assets are unavailable and restores them after the assets load.","additionalInfo":"","enAdditionalInfo":"","version":"0.1.2","icon":"💉","emoji":"💉","url":"https://awdrrawd.github.io/liko-Plugin-Repository/Plugins/Hotfix/HCR.user.js","website":"","category":"hotfix","tags":[]}];
+    const copy = {
+      zh: {
+        navPlugins: '插件', navInstall: '安裝', eyebrow: 'Liko 的插件管理器',
+        lead: '集中安裝、啟用與管理 Bondage Club 插件。推薦先安裝 PCM，再從收藏庫挑選你需要的功能。', installNow: '立即安裝 PCM', otherMethods: '其他安裝方式',
+        statAll: '全部插件', statLiko: 'Liko 插件', statCommunity: '社群插件', statHotfix: '修正補丁',
+        catalogEyebrow: '完整收藏', catalogTitle: '探索插件', filterAll: '全部', filterLiko: 'Liko', filterCommunity: '社群', filterHotfix: '補丁',
+        search: '搜尋名稱、功能或 ID…', count: (n) => `顯示 ${n} 款插件`, empty: '沒有符合條件的插件。',
+        install: '安裝', project: '專案網站', details: '補充',
+        installEyebrow: '推薦安裝方式', installTitle: '先安裝 PCM，再選擇插件。', installText: '使用 Tampermonkey、Violentmonkey 或 Userscripts 開啟安裝連結。進入遊戲後輸入 /pcm help 查看說明，或使用 /pcm list 查看插件狀態。', installPcm: '安裝 PCM',
+        bookmarkTitle: '🔖 書籤載入', bookmarkText: '不使用腳本管理器時，可建立一個載入 PCM 的書籤。', consoleTitle: '⌨️ 控制台載入', consoleText: '開啟開發者工具，在 Console 貼上載入指令。', singleTitle: '🧩 單獨安裝', singleText: '不使用 PCM 時，仍可從插件卡片直接安裝個別腳本。', showCode: '顯示程式碼', browsePlugins: '瀏覽插件'
+      },
+      en: {
+        navPlugins: 'Plugins', navInstall: 'Install', eyebrow: "Liko's plugin manager",
+        lead: 'Install, enable, and manage Bondage Club plugins in one place. Start with PCM, then choose the features you want from the collection.', installNow: 'Install PCM', otherMethods: 'Other install methods',
+        statAll: 'All plugins', statLiko: 'Liko plugins', statCommunity: 'Community', statHotfix: 'Hotfixes',
+        catalogEyebrow: 'The full collection', catalogTitle: 'Explore plugins', filterAll: 'All', filterLiko: 'Liko', filterCommunity: 'Community', filterHotfix: 'Hotfixes',
+        search: 'Search by name, feature, or ID…', count: (n) => `Showing ${n} plugins`, empty: 'No plugins match your search.',
+        install: 'Install', project: 'Project site', details: 'Note',
+        installEyebrow: 'Recommended setup', installTitle: 'Install PCM, then choose your plugins.', installText: 'Open the installer with Tampermonkey, Violentmonkey, or Userscripts. In game, enter /pcm help for instructions or /pcm list to view plugin status.', installPcm: 'Install PCM',
+        bookmarkTitle: '🔖 Bookmark loader', bookmarkText: 'Create a bookmark that loads PCM when you do not use a script manager.', consoleTitle: '⌨️ Console loader', consoleText: 'Open Developer Tools and paste the loader into the Console.', singleTitle: '🧩 Individual install', singleText: 'You can still install one script directly from its plugin card without PCM.', showCode: 'Show code', browsePlugins: 'Browse plugins'
+      }
+    };
+    const state = { language: 'zh', filter: 'all', query: '' };
+    const grid = document.querySelector('#grid');
+    const count = document.querySelector('#result-count');
+    const search = document.querySelector('#search');
+    const language = document.querySelector('#language');
+
+    const render = () => {
+      const t = copy[state.language];
+      const query = state.query.trim().toLocaleLowerCase();
+      const visible = plugins.filter((plugin) => {
+        const inCategory = state.filter === 'all' || plugin.category === state.filter;
+        const text = [plugin.id, plugin.name, plugin.enName, plugin.description, plugin.enDescription, ...plugin.tags].join(' ').toLocaleLowerCase();
+        return inCategory && (!query || text.includes(query));
+      });
+      count.textContent = t.count(visible.length);
+      grid.replaceChildren();
+      if (!visible.length) {
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = t.empty; grid.append(empty); return;
+      }
+      visible.forEach((plugin) => {
+        const card = document.createElement('article'); card.className = 'card';
+        const top = document.createElement('div'); top.className = 'card-top';
+        const icon = document.createElement('div'); icon.className = 'icon'; icon.textContent = plugin.emoji;
+        if (plugin.icon && /^https?:/i.test(plugin.icon)) {
+          const image = document.createElement('img'); image.src = plugin.icon; image.alt = ''; image.loading = 'lazy'; image.onerror = () => image.replaceWith(document.createTextNode(plugin.emoji)); icon.replaceChildren(image);
+        }
+        const version = document.createElement('span'); version.className = 'version'; version.textContent = plugin.version ? `v${plugin.version}` : plugin.id;
+        top.append(icon, version);
+        const title = document.createElement('h3'); title.textContent = state.language === 'zh' ? plugin.name : plugin.enName;
+        const secondary = document.createElement('p'); secondary.className = 'en-name'; secondary.textContent = state.language === 'zh' ? plugin.enName : plugin.id;
+        const description = document.createElement('p'); description.className = 'description'; description.textContent = state.language === 'zh' ? plugin.description : plugin.enDescription;
+        card.append(top, title, secondary, description);
+        const extraText = state.language === 'zh' ? plugin.additionalInfo : plugin.enAdditionalInfo;
+        if (extraText) { const extra = document.createElement('p'); extra.className = 'extra'; extra.textContent = extraText; card.append(extra); }
+        if (plugin.tags.length) { const meta = document.createElement('div'); meta.className = 'meta'; plugin.tags.forEach((tag) => { const chip = document.createElement('span'); chip.className = 'chip'; chip.textContent = tag; meta.append(chip); }); card.append(meta); }
+        const actions = document.createElement('div'); actions.className = 'card-actions';
+        const install = document.createElement('a'); install.className = 'button primary'; install.href = plugin.url; install.target = '_blank'; install.rel = 'noreferrer'; install.textContent = t.install;
+        actions.append(install);
+        if (plugin.website) { const project = document.createElement('a'); project.className = 'button'; project.href = plugin.website; project.target = '_blank'; project.rel = 'noreferrer'; project.textContent = t.project; actions.append(project); }
+        card.append(actions); grid.append(card);
+      });
+    };
+
+    const applyLanguage = () => {
+      const t = copy[state.language];
+      document.documentElement.lang = state.language === 'zh' ? 'zh-Hant' : 'en';
+      document.querySelectorAll('[data-t]').forEach((node) => { node.textContent = t[node.dataset.t]; });
+      search.placeholder = t.search;
+      language.textContent = state.language === 'zh' ? 'EN' : '中文';
+      render();
+    };
+
+    document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
+      state.filter = button.dataset.filter;
+      document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('active', item === button));
+      render();
+    }));
+    search.addEventListener('input', () => { state.query = search.value; render(); });
+    language.addEventListener('click', () => { state.language = state.language === 'zh' ? 'en' : 'zh'; applyLanguage(); });
+    applyLanguage();
+  </script>
+</body>
+</html>

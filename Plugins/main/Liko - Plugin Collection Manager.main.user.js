@@ -1208,7 +1208,7 @@
           else plugin.enabled = saved !== void 0 ? saved : false;
           if (pluginSettings[`${plugin.id}_customIcon`]) plugin.customIcon = pluginSettings[`${plugin.id}_customIcon`];
           const isEnabled = isTriStatePlugin(plugin)
-            ? (plugin.state === "stable" || plugin.state === "beta")
+            ? (plugin.state && plugin.state !== "off")
             : plugin.enabled;
           if (isEnabled) lockedPlugins.add(plugin.id);
           return plugin;
@@ -2768,7 +2768,7 @@
             else accountPluginSettings[id] = next;
             saveAccountSettings();
           } else {
-            const wasOn = plugin.state === "stable" || plugin.state === "beta";
+            const wasOn = plugin.state && plugin.state !== "off";
             if (wasOn && next === "off" && isPluginLocked(id)) {
               showToggleNotification("🔒", getPluginName(plugin), isCJK() ? "已鎖定，無法關閉" : "Locked, cannot disable");
               return;
@@ -2776,7 +2776,7 @@
             plugin.state = next;
             pluginSettings[id] = next;
             saveSettings(pluginSettings);
-            if (next === "stable" || next === "beta") { lockedPlugins.add(id); saveLockedPlugins(); }
+            if (next !== "off") { lockedPlugins.add(id); saveLockedPlugins(); }
           }
           tri.setAttribute("data-state", next);
           const item = tri.closest(".bc-plugin-item");

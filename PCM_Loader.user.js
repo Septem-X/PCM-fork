@@ -9,8 +9,8 @@
 // @exclude        *://*/changelog.html*
 // @grant          none
 // @icon           https://cdn.jsdelivr.net/gh/awdrrawd/liko-Plugin-Repository@main/Images/PCM_ICON.png
-// @updateURL      https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js
-// @downloadURL    https://awdrrawd.github.io/liko-Plugin-Repository/PCM_Loader.user.js
+// @updateURL      https://Septem-X.github.io/PCM-fork/PCM_Loader.user.js
+// @downloadURL    https://Septem-X.github.io/PCM-fork/PCM_Loader.user.js
 // @supportURL     https://github.com/awdrrawd/liko-Plugin-Repository/issues
 // @run-at         document-end
 // ==/UserScript==

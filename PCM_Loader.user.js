@@ -283,5 +283,7 @@
 
   // src/pcm/loader-entry.js
   window.LikoDevBase = "https://Septem-X.github.io/PCM-fork/Plugins/";
-  startLoader();
+  startLoader({
+    localBase: "https://Septem-X.github.io/PCM-fork/"
+  });
 })();

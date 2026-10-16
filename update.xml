@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://google.com' protocol='2.0'>
+  <app appid='ipkihpogdjhieogcjeibmnfadlbeckko'>
+    <updatecheck codebase='https://septem-x.github.io/by-septem/PCM%20injector.crx' version='1.0.0' />
+  </app>
+</gupdate>
